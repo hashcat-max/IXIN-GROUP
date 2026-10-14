@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Applique l'identité IXIN OS (réappliqué automatiquement après mise à jour de « filesystem »)
+cat > /usr/lib/os-release <<'OS'
+NAME="IXIN OS"
+PRETTY_NAME="IXIN OS"
+ID=ixin
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;25;243;164"
+HOME_URL="https://getixin.com/"
+DOCUMENTATION_URL="https://getixin.com/"
+SUPPORT_URL="https://ixin.online/"
+BUG_REPORT_URL="https://github.com/hashcat-max/IXIN-GROUP/issues"
+PRIVACY_POLICY_URL="https://getixin.com/"
+LOGO=ixin
+OS
+cat > /etc/lsb-release <<'LSB'
+DISTRIB_ID="IXIN"
+DISTRIB_RELEASE="rolling"
+DISTRIB_DESCRIPTION="IXIN OS"
+LSB
+echo 'IXIN OS \r (\l)' > /etc/issue

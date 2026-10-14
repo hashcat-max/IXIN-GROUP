@@ -1,0 +1,54 @@
+[Plymouth Theme]
+Name=IXIN
+Description=Écran de démarrage IXIN OS
+ModuleName=two-step
+
+[two-step]
+Font=Inter 12
+TitleFont=Inter Light 24
+ImageDir=/usr/share/plymouth/themes/ixin
+DialogHorizontalAlignment=.5
+DialogVerticalAlignment=.75
+TitleHorizontalAlignment=.5
+TitleVerticalAlignment=.382
+HorizontalAlignment=.5
+VerticalAlignment=.75
+WatermarkHorizontalAlignment=.5
+WatermarkVerticalAlignment=.45
+Transition=none
+TransitionDuration=0.0
+BackgroundStartColor=0x050505
+BackgroundEndColor=0x050505
+ProgressBarBackgroundColor=0x1a1d22
+ProgressBarForegroundColor=0x19f3a4
+MessageBelowAnimation=true
+
+[boot-up]
+UseEndAnimation=false
+
+[shutdown]
+UseEndAnimation=false
+
+[reboot]
+UseEndAnimation=false
+
+[updates]
+SuppressMessages=true
+ProgressBarShowPercentComplete=true
+UseProgressBar=true
+Title=Installation des mises à jour…
+SubTitle=N'éteignez pas l'ordinateur
+
+[system-upgrade]
+SuppressMessages=true
+ProgressBarShowPercentComplete=true
+UseProgressBar=true
+Title=Mise à niveau du système…
+SubTitle=N'éteignez pas l'ordinateur
+
+[firmware-upgrade]
+SuppressMessages=true
+ProgressBarShowPercentComplete=true
+UseProgressBar=true
+Title=Mise à jour du firmware…
+SubTitle=N'éteignez pas l'ordinateur

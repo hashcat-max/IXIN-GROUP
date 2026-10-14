@@ -1,0 +1,273 @@
+#!/usr/bin/env python3
+"""Centre IXIN — accueil, sécurité, jeux et système pour IXIN OS."""
+import os
+import platform
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QDesktopServices, QIcon, QPixmap
+from PyQt6.QtWidgets import (
+    QApplication, QCheckBox, QGridLayout, QHBoxLayout, QLabel, QMainWindow,
+    QPushButton, QTabWidget, QVBoxLayout, QWidget,
+)
+
+BRAND = "/usr/share/ixin/branding"
+CONF_DIR = Path.home() / ".config" / "ixin"
+NO_WELCOME = CONF_DIR / "no-welcome"
+IS_LIVE = Path("/run/archiso").exists()
+
+STYLE = """
+QWidget { background: #0b0c10; color: #e9ecef; font-family: Inter; font-size: 10.5pt; }
+QTabWidget::pane { border: 1px solid #1a1d22; border-radius: 8px; }
+QTabBar::tab { background: #111318; color: #8d9299; padding: 9px 18px; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+QTabBar::tab:selected { background: #050505; color: #19f3a4; }
+QPushButton { background: #151820; border: 1px solid #23272f; border-radius: 8px; padding: 10px 14px; text-align: left; }
+QPushButton:hover { border-color: #19f3a4; }
+QPushButton#primary { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #19f3a4, stop:1 #1c6bff); color: #050505; font-weight: 600; text-align: center; }
+QLabel#title { font-size: 22pt; font-weight: 300; }
+QLabel#sub { color: #8d9299; }
+QLabel#ok { color: #22c55e; } QLabel#warn { color: #fbbf24; } QLabel#bad { color: #ef4444; }
+"""
+
+
+def run(cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def active(unit):
+    return run(["systemctl", "is-active", unit]) == "active"
+
+
+def launch(*cmd):
+    if shutil.which(cmd[0]):
+        subprocess.Popen(list(cmd), start_new_session=True)
+
+
+def terminal(cmd):
+    """Exécute une commande (pouvant demander le mot de passe sudo) dans Konsole."""
+    launch("konsole", "--hold", "-e", "bash", "-c", cmd)
+
+
+def button(text, slot, primary=False):
+    b = QPushButton(text)
+    if primary:
+        b.setObjectName("primary")
+    b.setCursor(Qt.CursorShape.PointingHandCursor)
+    b.clicked.connect(slot)
+    return b
+
+
+def grid(buttons, cols=2):
+    w = QWidget()
+    g = QGridLayout(w)
+    g.setSpacing(10)
+    for i, b in enumerate(buttons):
+        g.addWidget(b, i // cols, i % cols)
+    return w
+
+
+def system_info():
+    mem = 0
+    try:
+        with open("/proc/meminfo") as f:
+            mem = int(f.readline().split()[1]) // 1024 // 1024
+    except OSError:
+        pass
+    cpu = ""
+    try:
+        with open("/proc/cpuinfo") as f:
+            cpu = next((l.split(":", 1)[1].strip() for l in f if l.startswith("model name")), "")
+    except OSError:
+        pass
+    gpu = ", ".join(l.split(": ", 1)[-1] for l in run(["lspci"]).splitlines()
+                    if "VGA" in l or "3D controller" in l) or "?"
+    return [("Système", "IXIN OS (live)" if IS_LIVE else "IXIN OS"),
+            ("Noyau", platform.release()),
+            ("Processeur", cpu or platform.machine()),
+            ("Carte graphique", gpu),
+            ("Mémoire", f"{mem + 1} Go" if mem else "?")]
+
+
+class Center(QMainWindow):
+    def __init__(self, welcome=False):
+        super().__init__()
+        self.setWindowTitle("Centre IXIN")
+        self.setWindowIcon(QIcon.fromTheme("ixin", QIcon(f"{BRAND}/ixin-logo-128.png")))
+        self.resize(860, 600)
+        tabs = QTabWidget()
+        tabs.addTab(self.home_tab(welcome), "Accueil")
+        tabs.addTab(self.security_tab(), "Sécurité")
+        tabs.addTab(self.gaming_tab(), "Jeux")
+        tabs.addTab(self.system_tab(), "Système")
+        self.setCentralWidget(tabs)
+
+    # ── Accueil ──
+    def home_tab(self, welcome):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(28, 24, 28, 24)
+        top = QHBoxLayout()
+        logo = QLabel()
+        logo.setPixmap(QPixmap(f"{BRAND}/ixin-logo-128.png").scaledToHeight(
+            96, Qt.TransformationMode.SmoothTransformation))
+        top.addWidget(logo)
+        txt = QVBoxLayout()
+        t = QLabel("Bienvenue dans IXIN OS")
+        t.setObjectName("title")
+        s = QLabel("Sécurité · Vie privée · Performance — dans l'esprit d'IXIN.")
+        s.setObjectName("sub")
+        txt.addWidget(t)
+        txt.addWidget(s)
+        top.addLayout(txt, 1)
+        v.addLayout(top)
+
+        info = QGridLayout()
+        for i, (k, val) in enumerate(system_info()):
+            kl = QLabel(k)
+            kl.setObjectName("sub")
+            vl = QLabel(val)
+            vl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            vl.setWordWrap(True)
+            info.addWidget(kl, i, 0)
+            info.addWidget(vl, i, 1)
+        v.addLayout(info)
+        v.addSpacing(10)
+
+        btns = []
+        if IS_LIVE:
+            btns.append(button("⬇  Installer IXIN OS sur ce PC", lambda: launch("/usr/local/bin/ixin-install"), True))
+        btns += [
+            button("⟳  Mettre à jour le système", lambda: terminal("ixin-update")),
+            button("🌐  getixin.com", lambda: QDesktopServices.openUrl(QUrl("https://getixin.com"))),
+            button("💬  ixin.online", lambda: QDesktopServices.openUrl(QUrl("https://ixin.online"))),
+        ]
+        v.addWidget(grid(btns))
+        v.addStretch(1)
+        if welcome or not IS_LIVE:
+            cb = QCheckBox("Afficher le Centre IXIN au démarrage")
+            cb.setChecked(not NO_WELCOME.exists())
+            cb.toggled.connect(self.set_welcome)
+            v.addWidget(cb)
+        return w
+
+    @staticmethod
+    def set_welcome(on):
+        CONF_DIR.mkdir(parents=True, exist_ok=True)
+        if on:
+            NO_WELCOME.unlink(missing_ok=True)
+        else:
+            NO_WELCOME.touch()
+
+    # ── Sécurité ──
+    def security_tab(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(28, 24, 28, 24)
+        h = QLabel("État de sécurité")
+        h.setObjectName("title")
+        v.addWidget(h)
+        lsm = ""
+        try:
+            lsm = Path("/sys/kernel/security/lsm").read_text()
+        except OSError:
+            pass
+        checks = [
+            (active("ufw"), "Pare-feu (connexions entrantes bloquées)"),
+            ("apparmor" in lsm, "AppArmor (confinement des applications)"),
+            ("crypt" in run(["lsblk", "-o", "TYPE"]), "Disque chiffré (LUKS)"),
+            (active("systemd-resolved"), "DNS chiffré (DNS-over-TLS, Quad9)"),
+            (active("opensnitchd"), "Pare-feu applicatif OpenSnitch (optionnel)"),
+            (active("usbguard"), "USBGuard — blocage des clés USB inconnues (optionnel)"),
+        ]
+        for ok, label in checks:
+            l = QLabel(("✔  " if ok else "•  ") + label)
+            l.setObjectName("ok" if ok else "warn")
+            v.addWidget(l)
+        v.addSpacing(12)
+        v.addWidget(grid([
+            button("Activer le pare-feu", lambda: terminal("ixin-secure firewall-on")),
+            button("Activer OpenSnitch (pare-feu applicatif)", lambda: terminal("ixin-secure opensnitch-on")),
+            button("Activer USBGuard", lambda: terminal("ixin-secure usbguard-on")),
+            button("Activer le service Tor", lambda: terminal("ixin-secure tor-on")),
+            button("Navigateur Tor", lambda: launch("torbrowser-launcher")),
+            button("Coffre-fort de mots de passe (KeePassXC)", lambda: launch("keepassxc")),
+            button("Conteneurs chiffrés (VeraCrypt)", lambda: launch("veracrypt")),
+            button("Nettoyer les métadonnées de fichiers", lambda: launch("metadata-cleaner")),
+            button("Audit de sécurité (Lynis)", lambda: terminal("ixin-secure audit")),
+            button("Analyse antivirus du dossier personnel", lambda: terminal("ixin-secure scan")),
+            button("Recherche de rootkits", lambda: terminal("ixin-secure rootkit")),
+            button("Rapport complet (terminal)", lambda: terminal("ixin-secure status")),
+        ]))
+        v.addStretch(1)
+        return w
+
+    # ── Jeux ──
+    def gaming_tab(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(28, 24, 28, 24)
+        h = QLabel("Jeux")
+        h.setObjectName("title")
+        v.addWidget(h)
+        tip = QLabel("Astuce Steam : Propriétés du jeu → Options de lancement →  "
+                     "<b>ixin-gaming %command%</b>  (GameMode + MangoHud).<br>"
+                     "Activez Proton pour tous les jeux : Steam → Paramètres → Compatibilité.")
+        tip.setWordWrap(True)
+        tip.setObjectName("sub")
+        v.addWidget(tip)
+        v.addSpacing(8)
+        v.addWidget(grid([
+            button("Steam", lambda: launch("steam"), True),
+            button("Heroic (Epic, GOG, Amazon)", lambda: launch("heroic")),
+            button("Lutris", lambda: launch("lutris")),
+            button("Bottles (applications Windows)", lambda: launch("bottles")),
+            button("ProtonUp-Qt (installer Proton-GE)", lambda: launch("protonup-qt")),
+            button("Profil énergie : Performance", lambda: launch("powerprofilesctl", "set", "performance")),
+            button("Profil énergie : Équilibré", lambda: launch("powerprofilesctl", "set", "balanced")),
+            button("Paramètres NVIDIA", lambda: launch("nvidia-settings")),
+        ]))
+        v.addStretch(1)
+        return w
+
+    # ── Système ──
+    def system_tab(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(28, 24, 28, 24)
+        h = QLabel("Système")
+        h.setObjectName("title")
+        v.addWidget(h)
+        v.addWidget(grid([
+            button("Mettre à jour (système, Flatpak, firmwares)", lambda: terminal("ixin-update"), True),
+            button("Logithèque (Discover / Flathub)", lambda: launch("plasma-discover")),
+            button("Instantanés système (Timeshift)", lambda: launch("timeshift-launcher")),
+            button("Gestionnaire de partitions", lambda: launch("partitionmanager")),
+            button("Paramètres du système", lambda: launch("systemsettings")),
+            button("Moniteur système", lambda: launch("plasma-systemmonitor")),
+            button("Nettoyage du disque (BleachBit)", lambda: launch("bleachbit")),
+            button("Journal système", lambda: launch("ksystemlog")),
+        ]))
+        v.addStretch(1)
+        return w
+
+
+def main():
+    welcome = "--welcome" in sys.argv
+    if welcome and NO_WELCOME.exists():
+        return 0
+    app = QApplication(sys.argv)
+    app.setDesktopFileName("ixin-center")
+    app.setStyleSheet(STYLE)
+    win = Center(welcome)
+    win.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

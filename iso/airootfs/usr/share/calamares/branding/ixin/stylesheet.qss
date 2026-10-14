@@ -1,0 +1,6 @@
+QWidget { font-family: "Inter"; }
+#mainApp { background-color: #0b0c10; }
+QPushButton { border-radius: 6px; padding: 6px 14px; }
+QPushButton:default { background-color: #19f3a4; color: #050505; font-weight: 600; }
+QProgressBar { border: 1px solid #1c6bff; border-radius: 4px; background: #111318; text-align: center; color: #e9ecef; }
+QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #19f3a4, stop:0.6 #1c6bff, stop:1 #a855f7); border-radius: 3px; }

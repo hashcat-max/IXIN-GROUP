@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# ixin-gaming — lance un jeu/programme avec les optimisations IXIN
+#   ixin-gaming <commande>          GameMode + MangoHud
+#   ixin-gaming --gamescope <cmd>   idem dans une session Gamescope
+# Dans Steam (Propriétés > Options de lancement) :  ixin-gaming %command%
+set -e
+export MANGOHUD=1
+export PROTON_ENABLE_NVAPI=1          # DLSS sur cartes NVIDIA
+export DXVK_ASYNC=1
+export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
+if [[ "$1" == "--gamescope" ]]; then
+    shift
+    exec gamemoderun gamescope -f -e -- "$@"
+fi
+exec gamemoderun "$@"

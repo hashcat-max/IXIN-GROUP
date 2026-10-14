@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+Target = lsb-release
+
+[Action]
+Description = Application de l'identité IXIN OS...
+When = PostTransaction
+Exec = /usr/local/bin/ixin-branding

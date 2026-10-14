@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# ixin-secure — état et réglages de sécurité d'IXIN OS
+set -u
+G='\e[38;2;25;243;164m'; R='\e[31m'; Y='\e[33m'; N='\e[0m'
+ok(){ echo -e "  ${G}✔${N} $*"; }; ko(){ echo -e "  ${R}✘${N} $*"; }; info(){ echo -e "  ${Y}•${N} $*"; }
+
+status() {
+    echo -e "${G}IXIN OS — État de sécurité${N}"
+    systemctl is-active -q ufw && sudo ufw status | grep -q "Status: active" && ok "Pare-feu actif (entrant bloqué)" || ko "Pare-feu inactif  →  ixin-secure firewall-on"
+    [[ -r /sys/kernel/security/lsm ]] && grep -q apparmor /sys/kernel/security/lsm && ok "AppArmor chargé" || ko "AppArmor non chargé (paramètre noyau lsm=…apparmor)"
+    lsblk -o TYPE | grep -q crypt && ok "Chiffrement de disque LUKS détecté" || info "Disque non chiffré (activez le chiffrement à l'installation)"
+    resolvectl status 2>/dev/null | grep -q "+DNSOverTLS" && ok "DNS chiffré (DNS-over-TLS)" || info "DNS-over-TLS non actif"
+    nmcli -t -f WIFI g 2>/dev/null | grep -q enabled && grep -q "wifi.cloned-mac-address=random" /etc/NetworkManager/conf.d/*.conf 2>/dev/null && ok "Adresse MAC Wi-Fi aléatoire" || info "MAC aléatoire non configurée"
+    systemctl is-active -q opensnitchd && ok "Pare-feu applicatif OpenSnitch actif" || info "OpenSnitch désactivé  →  ixin-secure opensnitch-on"
+    systemctl is-active -q usbguard && ok "USBGuard actif" || info "USBGuard désactivé  →  ixin-secure usbguard-on"
+    n=$(arch-audit -q 2>/dev/null | wc -l); [[ $n -eq 0 ]] && ok "Aucune vulnérabilité connue dans les paquets" || ko "$n paquet(s) vulnérable(s)  →  ixin-update"
+}
+
+case "${1:-status}" in
+    status)          status ;;
+    firewall-on)     sudo systemctl enable --now ufw && sudo ufw --force enable ;;
+    firewall-off)    sudo ufw disable ;;
+    opensnitch-on)   sudo systemctl enable --now opensnitchd && (opensnitch-ui &>/dev/null &) ;;
+    opensnitch-off)  sudo systemctl disable --now opensnitchd ;;
+    usbguard-on)     # autorise les périphériques déjà branchés, bloque les nouveaux inconnus
+                     sudo sh -c 'usbguard generate-policy > /etc/usbguard/rules.conf' && sudo systemctl enable --now usbguard ;;
+    usbguard-off)    sudo systemctl disable --now usbguard ;;
+    tor-on)          sudo systemctl enable --now tor && echo "Tor actif : utilisez « torsocks <commande> » ou le Navigateur Tor." ;;
+    tor-off)         sudo systemctl disable --now tor ;;
+    audit)           sudo lynis audit system --quick ;;
+    scan)            sudo freshclam; clamscan -r --bell -i "${2:-$HOME}" ;;
+    rootkit)         sudo rkhunter --update; sudo rkhunter --check --sk ;;
+    *) echo "Usage: ixin-secure [status|firewall-on|firewall-off|opensnitch-on|opensnitch-off|usbguard-on|usbguard-off|tor-on|tor-off|audit|scan [dossier]|rootkit]" ;;
+esac

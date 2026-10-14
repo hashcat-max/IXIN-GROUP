@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Installer IXIN OS
+Name[en]=Install IXIN OS
+Comment=Installer IXIN OS sur ce PC (seul ou à côté de Windows)
+Exec=/usr/local/bin/ixin-install
+Icon=ixin
+Terminal=false
+Categories=System;

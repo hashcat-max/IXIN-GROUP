@@ -1,0 +1,40 @@
+---
+componentName:  ixin
+welcomeStyleCalamares:   true
+welcomeExpandingLogo:   true
+windowExpanding:    normal
+windowSize: 1024px,640px
+windowPlacement: center
+sidebar: widget
+navigation: widget
+
+strings:
+    productName:         "IXIN OS"
+    shortProductName:    "IXIN"
+    version:             "rolling"
+    shortVersion:        "rolling"
+    versionedName:       "IXIN OS"
+    shortVersionedName:  "IXIN OS"
+    bootloaderEntryName: "IXIN"
+    productUrl:          https://getixin.com/
+    supportUrl:          https://ixin.online/
+    knownIssuesUrl:      https://github.com/hashcat-max/IXIN-GROUP/issues
+    releaseNotesUrl:     https://github.com/hashcat-max/IXIN-GROUP
+    donateUrl:           https://getixin.com/
+
+images:
+    productIcon:         "logo.png"
+    productLogo:         "logo.png"
+    productWelcome:      "welcome.png"
+
+style:
+   SidebarBackground:        "#050505"
+   SidebarText:              "#e9ecef"
+   SidebarTextCurrent:       "#050505"
+   SidebarBackgroundCurrent: "#19f3a4"
+
+slideshow:               "show.qml"
+slideshowAPI: 2
+
+uploadServer :
+    type :    "none"

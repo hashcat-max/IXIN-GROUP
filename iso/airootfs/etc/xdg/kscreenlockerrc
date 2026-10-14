@@ -1,0 +1,7 @@
+[Daemon]
+Autolock=true
+LockOnResume=true
+Timeout=10
+
+[Greeter][Wallpaper][org.kde.image][General]
+Image=/usr/share/ixin/wallpapers/ixin-void.png

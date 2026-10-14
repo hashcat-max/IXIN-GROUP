@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [ { "Name": "IXIN Group", "Email": "contact@getixin.com" } ],
+        "Category": "",
+        "Description": "Thème global IXIN OS — barre des tâches façon Windows, sombre émeraude/saphir",
+        "Id": "org.ixin.desktop",
+        "License": "GPL-2.0-or-later",
+        "Name": "IXIN",
+        "Version": "1.0",
+        "Website": "https://getixin.com"
+    },
+    "X-Plasma-APIVersion": "2"
+}

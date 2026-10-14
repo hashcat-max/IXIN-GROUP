@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# IXIN OS — étapes post-installation exécutées par Calamares dans le système cible (chroot)
+set -euo pipefail
+log(){ echo "[ixin-postinstall] $*"; }
+
+prepare() {
+    log "Installation des noyaux dans /boot"
+    for dir in /usr/lib/modules/*/; do
+        [[ -f "$dir/pkgbase" && -f "$dir/vmlinuz" ]] || continue
+        pkgbase=$(<"$dir/pkgbase")
+        install -Dm644 "$dir/vmlinuz" "/boot/vmlinuz-$pkgbase"
+        log "  vmlinuz-$pkgbase"
+        cat > "/etc/mkinitcpio.d/$pkgbase.preset" <<PRESET
+# mkinitcpio preset — '$pkgbase'
+ALL_kver="/boot/vmlinuz-$pkgbase"
+PRESETS=('default' 'fallback')
+default_image="/boot/initramfs-$pkgbase.img"
+fallback_image="/boot/initramfs-$pkgbase-fallback.img"
+fallback_options="-S autodetect"
+PRESET
+    done
+
+    log "Suppression de la configuration propre au live"
+    rm -f /etc/sudoers.d/10-ixin-live \
+          /etc/sddm.conf.d/90-ixin-live-autologin.conf \
+          /etc/mkinitcpio.conf.d/archiso.conf \
+          /etc/systemd/system/etc-pacman.d-gnupg.mount \
+          /etc/systemd/system/pacman-init.service \
+          /etc/systemd/system/multi-user.target.wants/pacman-init.service \
+          /etc/systemd/system/livecd-alsa-unmuter.service \
+          /etc/systemd/system/sound.target.wants/livecd-alsa-unmuter.service \
+          /etc/systemd/journald.conf.d/volatile-storage.conf \
+          /etc/systemd/logind.conf.d/do-not-suspend.conf \
+          /etc/pacman.d/hooks/uncomment-mirrors.hook \
+          /usr/share/applications/ixin-install.desktop \
+          /usr/local/bin/livecd-sound
+    rm -rf /usr/local/share/livecd-sound
+    # Services de VM inutiles sur une machine physique
+    if [[ "$(systemd-detect-virt 2>/dev/null || true)" == "none" ]]; then
+        rm -f /etc/systemd/system/multi-user.target.wants/{hv_fcopy_daemon,hv_kvp_daemon,hv_vss_daemon,vboxservice,vmtoolsd,vmware-vmblock-fuse}.service
+    fi
+    printf '\n\e[38;2;25;243;164m  IXIN OS\e[0m — tapez « ixin-secure » pour l’état de sécurité, « ixin-update » pour mettre à jour.\n\n' > /etc/motd
+
+    log "Initialisation du trousseau pacman"
+    rm -rf /etc/pacman.d/gnupg
+    pacman-key --init
+    pacman-key --populate archlinux chaotic || pacman-key --populate archlinux
+
+    log "Retrait des paquets propres au live"
+    pacman -Rdd --noconfirm calamares mkinitcpio-archiso 2>/dev/null || true
+    rm -rf /etc/calamares
+}
+
+finalize() {
+    local conf=/etc/mkinitcpio.conf
+    log "Hooks initramfs : microcode + plymouth"
+    if ! grep -qE '^HOOKS=.*\bmicrocode\b' "$conf"; then
+        sed -i -E 's/^(HOOKS=\(.*\bautodetect\b)/\1 microcode/' "$conf"
+    fi
+    if ! grep -qE '^HOOKS=.*\bplymouth\b' "$conf"; then
+        if grep -qE '^HOOKS=.*\bkms\b' "$conf"; then
+            sed -i -E 's/^(HOOKS=\(.*\bkms\b)/\1 plymouth/' "$conf"
+        else
+            sed -i -E 's/^(HOOKS=\(.*\budev\b)/\1 plymouth/' "$conf"
+        fi
+    fi
+    grep '^HOOKS=' "$conf"
+    plymouth-set-default-theme ixin || true
+}
+
+case "${1:-}" in
+    prepare)  prepare ;;
+    finalize) finalize ;;
+    *) echo "usage: $0 prepare|finalize" >&2; exit 1 ;;
+esac
