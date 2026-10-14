@@ -22,6 +22,7 @@ PRESET
 
     log "Suppression de la configuration propre au live"
     rm -f /etc/sudoers.d/10-ixin-live \
+          /etc/polkit-1/rules.d/49-ixin-live.rules \
           /etc/sddm.conf.d/90-ixin-live-autologin.conf \
           /etc/mkinitcpio.conf.d/archiso.conf \
           /etc/systemd/system/etc-pacman.d-gnupg.mount \
