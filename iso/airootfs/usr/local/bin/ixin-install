@@ -4,4 +4,5 @@ if [[ $EUID -ne 0 ]]; then
     exec sudo -E "$0" "$@"
 fi
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland;xcb}"
+export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-kde}"
 exec calamares "$@"

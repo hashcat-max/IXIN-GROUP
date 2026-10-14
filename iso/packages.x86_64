@@ -220,5 +220,6 @@ calamares
 ckbcomp
 archinstall
 arch-install-scripts
+squashfs-tools
 # ── Live ──
 livecd-sounds

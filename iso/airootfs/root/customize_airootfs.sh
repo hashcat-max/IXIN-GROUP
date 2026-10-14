@@ -61,3 +61,20 @@ for f in "DejaVuSans:14" "DejaVuSans:16" "DejaVuSans:18" "DejaVuSans-Bold:18" "D
     IFS=: read -r n s <<<"$f"
     grub-mkfont -s "$s" -o "/usr/share/grub/themes/ixin/${n}-${s}.pf2" "/usr/share/fonts/TTF/${n}.ttf" || true
 done
+
+# ── Live : pas de verrouillage ni d'extinction d'écran ──
+install -d -o liveuser -g liveuser /home/liveuser/.config
+cat > /home/liveuser/.config/kscreenlockerrc <<'CFG'
+[Daemon]
+Autolock=false
+LockOnResume=false
+CFG
+cat > /home/liveuser/.config/powerdevilrc <<'CFG'
+[AC][Display]
+TurnOffDisplayWhenIdle=false
+DimDisplayWhenIdle=false
+
+[AC][SuspendAndShutdown]
+AutoSuspendAction=0
+CFG
+chown -R liveuser:liveuser /home/liveuser/.config

@@ -4,6 +4,8 @@ import calamares.slideshow 1.0
 Presentation {
     id: presentation
 
+    Rectangle { anchors.fill: parent; color: "#050505"; z: -1 }
+
     function nextSlide() { presentation.goToNextSlide(); }
     Timer { id: advanceTimer; interval: 7000; running: presentation.activatedInCalamares; repeat: true; onTriggered: nextSlide() }
 
