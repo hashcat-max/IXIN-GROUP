@@ -31,9 +31,6 @@ systemctl set-default graphical.target
 sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
 sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/; s/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="DROP"/; s/^DEFAULT_OUTPUT_POLICY=.*/DEFAULT_OUTPUT_POLICY="ACCEPT"/; s/^IPV6=.*/IPV6=yes/' /etc/default/ufw
 
-# ── DNS : resolv.conf géré par systemd-resolved ──
-ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-
 # ── Thème Plymouth (animation du thème spinner + logo IXIN) ──
 cp -n /usr/share/plymouth/themes/spinner/{animation,throbber}-*.png /usr/share/plymouth/themes/ixin/ 2>/dev/null || true
 cp -n /usr/share/plymouth/themes/spinner/{bullet,capslock,entry,keyboard,keymap-render,lock}.png /usr/share/plymouth/themes/ixin/ 2>/dev/null || true
