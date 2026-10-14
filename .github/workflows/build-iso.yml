@@ -39,6 +39,7 @@ jobs:
               pacman -Syu --noconfirm
               cd /src && ./build.sh'
           sudo rm -rf /mnt/ixin/build
+          sudo chown -R "$USER" /mnt/ixin/out
           ls -lh /mnt/ixin/out
 
       - name: Découper l'ISO (limite GitHub de 2 Go par fichier)
@@ -46,7 +47,7 @@ jobs:
           cd /mnt/ixin/out
           ISO=$(ls ixin-os-*.iso)
           echo "ISO=$ISO" >> "$GITHUB_ENV"
-          sudo split -b 1900M -d -a 2 "$ISO" "$ISO.part"
+          split -b 1900M -d -a 2 "$ISO" "$ISO.part"
           ls -lh
 
       - name: Publier la Release
@@ -57,7 +58,7 @@ jobs:
           cd /mnt/ixin/out
           TAG="${GITHUB_REF_NAME}"
           [[ "$GITHUB_REF" == refs/tags/* ]] || TAG="build-$(date +%Y.%m.%d)-${GITHUB_RUN_NUMBER}"
-          cat > notes.md <<NOTES
+          cat > "$RUNNER_TEMP/notes.md" <<NOTES
           ## IXIN OS — ${ISO}
 
           L'ISO est découpée en morceaux de 1,9 Go (limite GitHub). Pour la reconstituer :
@@ -74,5 +75,5 @@ jobs:
           \`\`\`
           (ajoutez les morceaux suivants s'il y en a plus), puis gravez l'ISO sur une clé USB avec Rufus (mode GPT/UEFI) ou Ventoy.
           NOTES
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "IXIN OS $TAG" --notes-file notes.md \
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "IXIN OS $TAG" --notes-file "$RUNNER_TEMP/notes.md" \
             "$ISO".part* "$ISO.sha256"
