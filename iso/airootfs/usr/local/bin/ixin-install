@@ -3,6 +3,13 @@
 if [[ $EUID -ne 0 ]]; then
     exec sudo -E "$0" "$@"
 fi
+# Installation lancée depuis Windows (IXIN OS Setup) : l'espace libre est déjà préparé,
+# « Remplacer une partition » est présélectionné, et le chargeur de secours de Windows
+# (\EFI\Boot\bootx64.efi de sa partition EFI) n'est pas remplacé.
+if grep -qwF 'ixin.setup=windows' /proc/cmdline; then
+    sed -i 's/^initialPartitioningChoice:.*/initialPartitioningChoice: replace/' /etc/calamares/modules/partition.conf
+    sed -i 's/^installEFIFallback:.*/installEFIFallback: false/' /etc/calamares/modules/bootloader.conf
+fi
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland;xcb}"
 export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-kde}"
 exec calamares "$@"

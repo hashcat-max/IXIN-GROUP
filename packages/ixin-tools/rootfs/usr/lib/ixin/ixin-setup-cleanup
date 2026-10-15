@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# IXIN OS — après une installation lancée depuis Windows (IXIN OS Setup), au premier
+# démarrage : retire l'entrée de démarrage « IXIN OS Setup », son chargeur dans la
+# partition EFI et la partition IXIN-SETUP (≈ 6 Go) qui contenait l'ISO. L'espace libéré
+# est juste après Windows : « Gestion des disques → Étendre le volume » le lui rend.
+set -u
+FLAG=/var/lib/ixin/setup-from-windows
+log(){ echo "ixin-setup-cleanup : $*"; }
+
+# 1. Entrée de démarrage du firmware
+if [[ -d /sys/firmware/efi ]] && command -v efibootmgr >/dev/null; then
+    efibootmgr | sed -n 's/^Boot\([0-9A-Fa-f]\{4\}\)\*\{0,1\} IXIN OS Setup.*/\1/p' | while read -r num; do
+        efibootmgr -q -b "$num" -B && log "entrée de démarrage Boot$num « IXIN OS Setup » retirée"
+    done
+fi
+
+# 2. Chargeur de l'installateur dans la partition EFI
+for esp in /boot/efi /efi /boot; do
+    if [[ -d "$esp/EFI/IXIN-SETUP" ]]; then
+        rm -rf -- "$esp/EFI/IXIN-SETUP" && log "$esp/EFI/IXIN-SETUP supprimé"
+    fi
+done
+
+# 3. Partition IXIN-SETUP : supprimée seulement si elle est reconnue sans ambiguïté
+#    (exFAT, étiquette IXIN-SETUP, contient ixin-os.iso, non montée).
+mapfile -t parts < <(blkid -t LABEL=IXIN-SETUP -o device 2>/dev/null)
+if (( ${#parts[@]} == 1 )); then
+    dev="${parts[0]}"
+    if [[ "$(blkid -s TYPE -o value "$dev")" != exfat ]]; then
+        log "$dev n'est pas une partition exFAT : conservée"
+    elif findmnt -rn -S "$dev" >/dev/null; then
+        log "$dev est montée : conservée"
+    else
+        tmp="$(mktemp -d)"
+        has_iso=0
+        if mount -o ro "$dev" "$tmp" 2>/dev/null; then
+            [[ -f "$tmp/ixin-os.iso" ]] && has_iso=1
+            umount "$tmp"
+        fi
+        rmdir "$tmp"
+        name="$(basename "$dev")"
+        disk="/dev/$(lsblk -no PKNAME "$dev" | head -1)"
+        num="$(cat "/sys/class/block/$name/partition" 2>/dev/null)"
+        if (( has_iso )) && [[ -b "$disk" && -n "$num" ]]; then
+            if sfdisk -q --delete "$disk" "$num" 2>/dev/null; then
+                partx -d --nr "$num" "$disk" 2>/dev/null
+                udevadm settle 2>/dev/null
+                if [[ -b "$dev" ]]; then
+                    log "partition $dev retirée de la table (disparaît au prochain démarrage)"
+                else
+                    log "partition $dev (IXIN-SETUP) supprimée"
+                fi
+            else
+                log "échec de la suppression de $dev : conservée"
+            fi
+        else
+            log "$dev ne contient pas l'ISO d'IXIN OS : conservée"
+        fi
+    fi
+elif (( ${#parts[@]} > 1 )); then
+    log "plusieurs partitions IXIN-SETUP trouvées : aucune n'est supprimée"
+fi
+
+rm -f "$FLAG"
+exit 0

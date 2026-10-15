@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Installer IXIN OS à côté de Windows
+Comment=Accueil de l'installation lancée depuis Windows (IXIN OS Setup)
+Exec=/usr/local/bin/ixin-setup-windows
+Icon=ixin
+NoDisplay=true
+X-KDE-autostart-phase=2

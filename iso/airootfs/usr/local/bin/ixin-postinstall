@@ -8,7 +8,7 @@ prepare() {
     for dir in /usr/lib/modules/*/; do
         [[ -f "$dir/pkgbase" && -f "$dir/vmlinuz" ]] || continue
         pkgbase=$(<"$dir/pkgbase")
-        # /boot est la partition EFI (FAT32) : cp sans chmod
+        # /boot : partition ext4 séparée (FAT32 sur les premières versions) : cp sans chmod
         cp -f "$dir/vmlinuz" "/boot/vmlinuz-$pkgbase"
         log "  vmlinuz-$pkgbase"
         cat > "/etc/mkinitcpio.d/$pkgbase.preset" <<PRESET
@@ -34,6 +34,8 @@ PRESET
           /etc/pacman.d/hooks/uncomment-mirrors.hook \
           /etc/xdg/kxkbrc \
           /usr/share/applications/ixin-install.desktop \
+          /etc/xdg/autostart/ixin-setup-windows.desktop \
+          /usr/local/bin/ixin-setup-windows \
           /usr/local/bin/livecd-sound
     rm -rf /usr/local/share/livecd-sound
     # Services de VM inutiles sur une machine physique
@@ -73,6 +75,13 @@ finalize() {
     mkdir -p /boot/grub/themes
     rm -rf /boot/grub/themes/ixin
     cp -r /usr/share/grub/themes/ixin /boot/grub/themes/ixin
+
+    if grep -qwF 'ixin.setup=windows' /proc/cmdline; then
+        log "Installation lancée depuis Windows : nettoyage de l'installateur au premier démarrage"
+        mkdir -p /var/lib/ixin
+        touch /var/lib/ixin/setup-from-windows
+        systemctl enable ixin-setup-cleanup.service
+    fi
 
     log "Retrait des scripts propres au live"
     rm -f /usr/local/bin/ixin-install /usr/local/bin/ixin-postinstall

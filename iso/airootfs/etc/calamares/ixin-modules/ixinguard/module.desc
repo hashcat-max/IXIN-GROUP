@@ -1,0 +1,7 @@
+# IXIN OS — garde-fou exécuté avant toute modification du disque
+---
+type:       "job"
+name:       "ixinguard"
+interface:  "python"
+script:     "main.py"
+noconfig:   true

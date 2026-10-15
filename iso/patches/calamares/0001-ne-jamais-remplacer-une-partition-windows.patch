@@ -1,0 +1,18 @@
+--- a/src/modules/partition/core/PartUtils.cpp
++++ b/src/modules/partition/core/PartUtils.cpp
+@@ -92,6 +92,15 @@
+         return false;
+     }
+ 
++    // IXIN OS : une partition Windows (NTFS ou chiffrée BitLocker) contient les données de
++    // l'utilisateur ; elle n'est jamais proposée au remplacement (partitionnement manuel requis).
++    if ( candidate->fileSystem().type() == FileSystem::Ntfs
++         || candidate->fileSystem().type() == FileSystem::BitLocker )
++    {
++        cDebug() << Logger::SubEntry << "NO, it is a Windows (NTFS / BitLocker) partition.";
++        return false;
++    }
++
+     bool ok = false;
+     double requiredStorageGiB = getRequiredStorageGiB( ok );
+     if ( !ok )

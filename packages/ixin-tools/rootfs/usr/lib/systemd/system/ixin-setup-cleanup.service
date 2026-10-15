@@ -1,0 +1,11 @@
+[Unit]
+Description=IXIN OS : nettoyage de l'installation lancée depuis Windows
+ConditionPathExists=/var/lib/ixin/setup-from-windows
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/ixin/ixin-setup-cleanup
+
+[Install]
+WantedBy=multi-user.target

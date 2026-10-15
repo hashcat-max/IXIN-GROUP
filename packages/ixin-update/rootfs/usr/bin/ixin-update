@@ -991,8 +991,9 @@ def cmd_set_mode(args):
 
 
 def cmd_boot_check(args):
-    """Après restauration d'un point de restauration, /boot (partition EFI) peut contenir un noyau
-    plus récent que les modules du système restauré : on réinstalle le noyau correspondant."""
+    """Après restauration d'un point de restauration, /boot (partition séparée, hors des points
+    de restauration Btrfs) peut contenir un noyau plus récent que les modules du système
+    restauré : on réinstalle le noyau correspondant."""
     require_root()
     if is_live():
         return 0

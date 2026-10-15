@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""IXIN OS — accueil de l'installation lancée depuis Windows (IXIN OS Setup).
+
+Affiché au démarrage de la session live lorsque le noyau a reçu « ixin.setup=windows »
+(menu de démarrage installé par IXIN OS Setup). Explique l'unique choix à faire dans
+l'installeur et le lance. Sans ce paramètre, le programme ne fait rien.
+"""
+import subprocess
+import sys
+from pathlib import Path
+
+GIB = 1024 ** 3
+
+
+def from_windows():
+    try:
+        return "ixin.setup=windows" in Path("/proc/cmdline").read_text().split()
+    except OSError:
+        return False
+
+
+def largest_free_space():
+    """Plus grand espace libre (octets) du disque qui contient la partition IXIN-SETUP."""
+    try:
+        part = subprocess.run(["blkid", "-L", "IXIN-SETUP"], capture_output=True, text=True).stdout.strip()
+        if not part:
+            return None
+        disk = subprocess.run(["lsblk", "-no", "PKNAME", part], capture_output=True, text=True).stdout.strip()
+        out = subprocess.run(["sfdisk", "--list-free", "--bytes", f"/dev/{disk}"],
+                             capture_output=True, text=True).stdout
+    except OSError:
+        return None
+    # Lignes du tableau : début, fin, secteurs, taille en octets
+    sizes = [int(cols[3]) for cols in map(str.split, out.splitlines())
+             if len(cols) == 4 and all(c.isdigit() for c in cols)]
+    return max(sizes) if sizes else None
+
+
+STYLE = """
+QWidget { background: #0b0c10; color: #e9ecef; font-family: Inter; font-size: 10.5pt; }
+QLabel#title { font-size: 17pt; font-weight: 600; color: #ffffff; }
+QLabel#accent { color: #19f3a4; font-weight: 600; }
+QFrame#card { background: #111318; border: 1px solid #1f232b; border-radius: 12px; }
+QPushButton { background: #151820; border: 1px solid #23272f; border-radius: 8px; padding: 10px 18px; }
+QPushButton:hover { border-color: #19f3a4; }
+QPushButton#primary { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #19f3a4, stop:1 #1c6bff);
+                      color: #050505; font-weight: 600; }
+"""
+
+
+def main():
+    if not from_windows():
+        return 0
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QIcon, QPixmap
+    from PyQt6.QtWidgets import (QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
+                                 QVBoxLayout)
+
+    app = QApplication(sys.argv)
+    app.setDesktopFileName("ixin-install")
+    app.setStyleSheet(STYLE)
+    dlg = QDialog()
+    dlg.setWindowTitle("Installer IXIN OS à côté de Windows")
+    dlg.setWindowIcon(QIcon.fromTheme("ixin"))
+    dlg.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+    dlg.setMinimumWidth(620)
+    lay = QVBoxLayout(dlg)
+    lay.setContentsMargins(28, 24, 28, 24)
+    lay.setSpacing(14)
+
+    head = QHBoxLayout()
+    logo = QLabel()
+    pix = QPixmap("/usr/share/ixin/branding/ixin-logo-64.png")
+    if not pix.isNull():
+        logo.setPixmap(pix)
+    head.addWidget(logo)
+    title = QLabel("Installer IXIN OS à côté de Windows")
+    title.setObjectName("title")
+    head.addWidget(title, 1)
+    lay.addLayout(head)
+
+    free = largest_free_space()
+    size_txt = f" de <b>{free / GIB:.0f} Go</b>" if free else ""
+    intro = QLabel("Windows reste installé et vos fichiers ne sont pas modifiés. "
+                   f"IXIN OS Setup a préparé un espace libre{size_txt} pour IXIN OS.")
+    intro.setWordWrap(True)
+    lay.addWidget(intro)
+
+    card = QFrame()
+    card.setObjectName("card")
+    cl = QVBoxLayout(card)
+    cl.setContentsMargins(18, 14, 18, 14)
+    step = QLabel("Une seule étape demande votre attention : « Partitions »")
+    step.setObjectName("accent")
+    cl.addWidget(step)
+    steps = QLabel(
+        "1. « Remplacer une partition » est déjà sélectionné.<br>"
+        "2. Cliquez sur la zone grise <b>« Espace libre »</b> dans la barre du disque.<br>"
+        "3. Cochez <b>« Chiffrer le système »</b> et choisissez une phrase secrète (recommandé).<br><br>"
+        "Pour protéger Windows, les autres choix (effacer le disque, réduire Windows) sont bloqués.")
+    steps.setWordWrap(True)
+    cl.addWidget(steps)
+    lay.addWidget(card)
+
+    after = QLabel("Après l'installation, un menu au démarrage du PC permet de choisir "
+                   "entre IXIN OS et Windows.")
+    after.setWordWrap(True)
+    lay.addWidget(after)
+
+    buttons = QHBoxLayout()
+    later = QPushButton("Découvrir IXIN OS d'abord")
+    later.clicked.connect(dlg.reject)
+    start = QPushButton("Lancer l'installation")
+    start.setObjectName("primary")
+    start.setDefault(True)
+    start.clicked.connect(dlg.accept)
+    buttons.addStretch(1)
+    buttons.addWidget(later)
+    buttons.addWidget(start)
+    lay.addLayout(buttons)
+
+    if dlg.exec() == QDialog.DialogCode.Accepted:
+        subprocess.Popen(["/usr/local/bin/ixin-install"], start_new_session=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

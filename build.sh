@@ -39,18 +39,43 @@ pacman -Q chaotic-keyring chaotic-mirrorlist &>/dev/null || pacman -U --noconfir
     'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
 
 msg "Paquets AUR compilés localement : ${AUR_PKGS[*]}"
-mkdir -p "$REPO" "$BUILD/aur"
+# Sources téléchargées une fois pour toutes dans $BUILD/srcdest (on peut aussi les y déposer
+# à l'avance). Correctifs IXIN : iso/patches/<paquet>/*.patch, appliqués après extraction ;
+# leur empreinte est notée à côté du paquet, reconstruit dès qu'un correctif change.
+mkdir -p "$REPO" "$BUILD/aur" "$BUILD/srcdest"
 id ixinbuild &>/dev/null || useradd -m ixinbuild
 echo 'ixinbuild ALL=(ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/ixinbuild
-chown -R ixinbuild: "$BUILD/aur"
+chown -R ixinbuild: "$BUILD/aur" "$BUILD/srcdest"
 for pkg in "${AUR_PKGS[@]}"; do
-    if compgen -G "$REPO/$pkg-[0-9]*.pkg.tar.zst" >/dev/null; then
+    patches=()
+    [[ -d "$ROOT/iso/patches/$pkg" ]] && mapfile -t patches < <(find "$ROOT/iso/patches/$pkg" -name '*.patch' | sort)
+    stamp="$(cat /dev/null "${patches[@]}" | sha256sum | cut -c1-16)"
+    if compgen -G "$REPO/$pkg-[0-9]*.pkg.tar.zst" >/dev/null && [[ "$(cat "$REPO/$pkg.ixin-patches" 2>/dev/null)" == "$stamp" ]]; then
         msg "  $pkg déjà construit"; continue
     fi
+    rm -f "$REPO/$pkg"-[0-9]*.pkg.tar.zst
     rm -rf "$BUILD/aur/$pkg"
     sudo -u ixinbuild git clone -q "https://aur.archlinux.org/$pkg.git" "$BUILD/aur/$pkg"
-    (cd "$BUILD/aur/$pkg" && sudo -u ixinbuild makepkg -s --noconfirm --needed)
+    (
+        cd "$BUILD/aur/$pkg"
+        mk=(sudo -u ixinbuild env SRCDEST="$BUILD/srcdest" makepkg --noconfirm)
+        if (( ${#patches[@]} )); then
+            "${mk[@]}" -s --needed --nobuild
+            for p in "${patches[@]}"; do
+                target="$(sed -n 's#^+++ b/##p' "$p" | head -1)"
+                top="$(for d in src/*/; do [[ -f "$d$target" ]] && echo "$d" && break; done)"
+                [[ -n "$top" ]] || die "correctif $(basename "$p") : $target introuvable dans les sources de $pkg"
+                msg "  correctif IXIN : $(basename "$p")"
+                sudo -u ixinbuild patch -d "$top" -p1 --forward --no-backup-if-mismatch < "$p" \
+                    || die "correctif $(basename "$p") non applicable"
+            done
+            "${mk[@]}" --noextract
+        else
+            "${mk[@]}" -s --needed
+        fi
+    )
     find "$BUILD/aur/$pkg" -maxdepth 1 -name "$pkg-[0-9]*.pkg.tar.zst" -exec cp {} "$REPO/" \;
+    echo "$stamp" > "$REPO/$pkg.ixin-patches"
 done
 
 msg "Paquets IXIN (dépôt [ixin] signé)"
