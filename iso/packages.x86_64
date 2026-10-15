@@ -12,6 +12,7 @@ amd-ucode
 mkinitcpio
 mkinitcpio-archiso
 mkinitcpio-nfs-utils
+nbd
 syslinux
 memtest86+
 memtest86+-efi
