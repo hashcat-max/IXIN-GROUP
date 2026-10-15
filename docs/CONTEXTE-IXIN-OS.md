@@ -126,6 +126,8 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
 - Layout: EFI partition (512 MB, or the existing Windows one) + separate **1 GB `/boot`** (ext4, holds the kernel)
   + **Btrfs** system (subvolumes `@`, `@home`, `@cache`, `@log`, compatible with Timeshift snapshots), with optional
   **LUKS2** encryption. Windows partitions (NTFS / BitLocker) can never be selected for replacement.
+- Boot menu (dual boot): **IXIN OS**, **Windows**, firmware settings. "Windows" restarts the PC straight into Windows
+  through the firmware, exactly as without IXIN, so BitLocker does not ask for its recovery key.
 - **GRUB** bootloader with **automatic Windows detection** (dual-boot menu).
 - Requirements: 64-bit (x86_64) PC with **UEFI** (legacy BIOS works for the live system), **4 GB RAM** minimum (8+ recommended), **40 GB** of disk.
 
@@ -217,7 +219,11 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
   `tools/ixin-enable-updates.sh` (see docs/MISES-A-JOUR.md); the next ISO, built once the IXIN signing key
   is configured on GitHub, includes it.
 - IXIN OS Setup (Windows): tested on every change on a real Windows 11 (GitHub Actions) with a virtual disk —
-  full preparation then full undo, boot menu entry. Not yet tested on a range of real PCs: call it **"Beta"** as well.
+  full preparation then full undo, firmware boot entries. The IXIN side was tested end to end in a VM on a simulated
+  Windows PC: firmware boot entry → "IXIN OS Setup" menu → live system started from the ISO stored on the disk →
+  guided install into the free space (Windows partitions cannot be selected), encrypted → first boot with automatic
+  cleanup → "IXIN / Windows" boot menu, Windows started by the firmware (no BitLocker recovery prompt), Windows files
+  intact. Not yet tested on a range of real PCs: call it **"Beta"** as well.
 - Ideas for later versions: Secure Boot signing, an optional "macOS-style" layout (dock), an optional security toolbox,
   code signing for IXIN OS Setup, a dedicated package repository, translations.
 

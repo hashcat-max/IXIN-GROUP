@@ -163,5 +163,7 @@ Journal détaillé : `C:\ProgramData\IXIN\setup.log` ; état : `C:\ProgramData\I
 - Démarrage BIOS (Legacy) ou disque MBR : non pris en charge, utilisez une clé USB.
 - PC avec plusieurs disques : IXIN OS s'installe sur le disque de Windows.
 - Secure Boot : à désactiver (section 3).
-- Testé sur Windows (disque virtuel) ; à valider sur une grande variété de PC réels (firmwares de
-  marques différentes) : signalez tout problème avec le fichier `C:\ProgramData\IXIN\setup.log`.
+- Testé sur Windows (disque virtuel) et, côté IXIN OS, de bout en bout en machine virtuelle sur un PC
+  Windows simulé (menu IXIN OS Setup, installation dans l'espace libre, nettoyage, menu IXIN / Windows) ;
+  à valider sur une grande variété de PC réels (firmwares de marques différentes) : signalez tout
+  problème avec le fichier `C:\ProgramData\IXIN\setup.log`.
