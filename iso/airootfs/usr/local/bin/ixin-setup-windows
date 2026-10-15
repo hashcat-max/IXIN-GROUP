@@ -20,20 +20,27 @@ def from_windows():
 
 
 def largest_free_space():
-    """Plus grand espace libre (octets) du disque qui contient la partition IXIN-SETUP."""
+    """Plus grand espace libre (octets) du disque qui contient la partition IXIN-SETUP.
+
+    Calculé depuis /sys (lisible sans droits d'administrateur : ce programme tourne
+    dans la session de l'utilisateur live) à partir du début et de la taille des partitions.
+    """
     try:
         part = subprocess.run(["blkid", "-L", "IXIN-SETUP"], capture_output=True, text=True).stdout.strip()
         if not part:
             return None
-        disk = subprocess.run(["lsblk", "-no", "PKNAME", part], capture_output=True, text=True).stdout.strip()
-        out = subprocess.run(["sfdisk", "--list-free", "--bytes", f"/dev/{disk}"],
-                             capture_output=True, text=True).stdout
-    except OSError:
+        disk = Path("/sys/class/block", Path(part).name).resolve().parent
+        total = int((disk / "size").read_text())          # secteurs de 512 octets
+        spans = sorted((int((p / "start").read_text()), int((p / "size").read_text()))
+                       for p in disk.iterdir() if (p / "partition").exists())
+    except (OSError, ValueError):
         return None
-    # Lignes du tableau : début, fin, secteurs, taille en octets
-    sizes = [int(cols[3]) for cols in map(str.split, out.splitlines())
-             if len(cols) == 4 and all(c.isdigit() for c in cols)]
-    return max(sizes) if sizes else None
+    pos, best = 2048, 0                                   # zone utilisable d'un disque GPT
+    for start, size in spans:
+        best = max(best, start - pos)
+        pos = max(pos, start + size)
+    best = max(best, total - 34 - pos)
+    return best * 512 if best > 0 else None
 
 
 STYLE = """

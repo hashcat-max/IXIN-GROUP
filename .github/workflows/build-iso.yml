@@ -92,7 +92,9 @@ jobs:
           ### Installer à côté de Windows (le plus simple)
           Téléchargez **IXIN-OS-Setup.exe** ci-dessous et lancez-le sous Windows 10 ou 11 : il vérifie le PC,
           télécharge IXIN OS, prépare l'espace sur le disque et redémarre sur l'installation (sans clé USB).
-          Windows reste installé. Guide : docs/INSTALLATION-WINDOWS.md
+          Windows reste installé. Guide : https://github.com/${GITHUB_REPOSITORY}/blob/HEAD/docs/INSTALLATION-WINDOWS.md
+          Si Windows affiche « Windows a protégé votre ordinateur » : **Informations complémentaires → Exécuter quand même**
+          (le programme n'est pas encore signé ; son code source est dans le dossier windows/ du dépôt).
 
           ### Clé USB, machine virtuelle ou disque entier
           L'ISO est découpée en morceaux de 1,9 Go (limite GitHub). Pour la reconstituer :
