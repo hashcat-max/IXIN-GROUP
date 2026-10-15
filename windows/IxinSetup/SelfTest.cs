@@ -50,6 +50,8 @@ namespace IxinSetup
                 File.WriteAllBytes(iso, rnd);
                 string isoSha = IsoSource.Sha256(iso, null, CancellationToken.None);
 
+                Expect(Storage.UnblockShrink(win, hibernation: false), "regroupement de l'espace libre (defrag /X)");
+
                 var facts = Facts.Collect(win);
                 Console.WriteLine(facts.Describe());
                 Expect(facts.Problem == null, "lecture du disque virtuel");

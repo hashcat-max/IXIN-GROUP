@@ -25,6 +25,15 @@ namespace IxinSetup
 
         public static string Run(string exe, string args, bool check = true)
         {
+            int code = Exec(exe, args, out string output);
+            if (check && code != 0)
+                throw new SetupException($"La commande « {exe} {args} » a échoué : {output.Trim()}");
+            return output;
+        }
+
+        /// <summary>Lance un programme de System32 et renvoie son code de sortie.</summary>
+        public static int Exec(string exe, string args, out string output)
+        {
             var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, exe), args)
             {
                 UseShellExecute = false,
@@ -34,12 +43,11 @@ namespace IxinSetup
             };
             using (var p = Process.Start(psi))
             {
-                string output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
+                var error = p.StandardError.ReadToEndAsync();   // lu en parallèle : pas de blocage si la sortie d'erreur est remplie
+                output = p.StandardOutput.ReadToEnd() + error.Result;
                 p.WaitForExit();
                 Log.Info($"{exe} {args} → {p.ExitCode}");
-                if (check && p.ExitCode != 0)
-                    throw new SetupException($"La commande « {exe} {args} » a échoué : {output.Trim()}");
-                return output;
+                return p.ExitCode;
             }
         }
 

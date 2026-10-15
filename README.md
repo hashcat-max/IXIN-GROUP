@@ -20,7 +20,7 @@ aux jeux Steam / Windows**.
 | **Vie privée** | Navigateur Tor, Tor + torsocks, Signal, KeePassXC, VeraCrypt, GnuPG/Kleopatra, mat2 / Metadata Cleaner, BleachBit, WireGuard / OpenVPN. |
 | **Applications** | Firefox, Thunderbird, LibreOffice, VLC, mpv, OBS Studio, GIMP, Dolphin, Kate, Okular, Gwenview, Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs). |
 | **Mises à jour** | **IXIN Update** : mises à jour automatiques comme sous Windows — correctifs de sécurité installés dès leur publication (détection des CVE via le suivi de sécurité Arch), le reste une fois par jour en arrière-plan, point de restauration Btrfs avant chaque mise à jour, notifications KDE, report pendant les jeux / sur batterie. L'équipe IXIN peut **pousser** des mises à jour et correctifs urgents signés sur tous les PC (dépôt `[ixin]`). Voir [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md). |
-| **Installation** | Calamares : « À côté de Windows » (redimensionnement automatique), Btrfs avec sous-volumes `@ @home @cache @log`, chiffrement **LUKS2 (argon2id)** déverrouillé au démarrage sur l'écran IXIN, partition de démarrage EFI de 1 Go, GRUB avec détection de Windows (os-prober). |
+| **Installation** | **IXIN OS Setup** pour installer depuis Windows sans clé USB ([guide](docs/INSTALLATION-WINDOWS.md)). Calamares : « À côté de Windows » (redimensionnement automatique, partitions Windows jamais effaçables), Btrfs avec sous-volumes `@ @home @cache @log`, chiffrement **LUKS2 (argon2id)** déverrouillé au démarrage sur l'écran IXIN, partition `/boot` séparée de 1 Go (fonctionne avec la petite partition EFI de Windows), GRUB avec détection de Windows (os-prober). |
 
 ## Obtenir l'ISO
 
@@ -41,6 +41,15 @@ docker run --rm --privileged -v "$PWD":/src archlinux:latest \
 Prévoir ~35 Go d'espace disque.
 
 ## Installer à côté de Windows (dual-boot)
+
+### Le plus simple : IXIN OS Setup (sans clé USB)
+
+Téléchargez **IXIN-OS-Setup.exe** dans la dernière Release et lancez-le sous Windows 10 ou 11 :
+il vérifie le PC (UEFI, espace libre, BitLocker, Secure Boot), télécharge et vérifie IXIN OS,
+réduit Windows, prépare le démarrage puis redémarre sur l'installation. Tout est annulable tant
+qu'IXIN OS n'est pas installé. Guide complet : [docs/INSTALLATION-WINDOWS.md](docs/INSTALLATION-WINDOWS.md).
+
+### Avec une clé USB
 
 1. **Sous Windows** : désactivez le *Démarrage rapide* (Panneau de configuration → Options d'alimentation)
    et **suspendez BitLocker** si le disque est chiffré — sinon la partition Windows ne peut pas être redimensionnée.
@@ -100,13 +109,17 @@ build.sh                      script de construction de l'ISO
 packages/                     paquets IXIN (ixin-tools, ixin-update, ixin-settings, ixin-artwork…)
 repo/policy.json              politique IXIN Update (urgent, blocages, annonces)
 tools/                        construction/signature des paquets, clé de signature, migration bêta
+windows/                      installation depuis Windows
+├── IxinSetup/                IXIN-OS-Setup.exe (C#, .NET Framework 4.8)
+└── boot/                     menu GRUB « IXIN OS Setup » (démarre l'ISO depuis le disque)
 iso/                          profil archiso
 ├── profiledef.sh             nom, étiquette, modes de démarrage
 ├── packages.x86_64           liste des paquets
 ├── pacman.conf               dépôts (core, extra, multilib, chaotic-aur, local)
 ├── efiboot/ syslinux/ grub/  menus de démarrage UEFI / BIOS
+├── patches/                  correctifs IXIN des paquets AUR (Calamares)
 └── airootfs/                 fichiers du système
-    ├── etc/calamares/        configuration de l'installeur
+    ├── etc/calamares/        configuration de l'installeur (+ ixin-modules/ixinguard)
     └── usr/local/bin/        scripts du live (installation)
 ```
 

@@ -13,6 +13,7 @@ namespace IxinSetup
         public CheckLevel Level;
         public string Title;
         public string Detail;
+        public bool UnmovableFiles;   // réduction limitée par des fichiers système : « Débloquer la réduction » proposé
 
         public Check(CheckLevel level, string title, string detail = null)
         {
@@ -76,11 +77,19 @@ namespace IxinSetup
                 long max = MaxIxin(f, DefaultIsoSize, true);
                 if (max < MinIxin)
                 {
-                    long needed = MinIxin + SetupSizeFor(DefaultIsoSize) + KeepWindowsFree + DefaultIsoSize;
-                    list.Add(new Check(CheckLevel.Blocking, "Espace libre insuffisant sur " + f.DriveLetter + ":",
-                        $"Il faut environ {Facts.Gb(needed)} libres sur Windows ({Facts.Gb(f.Free)} actuellement" +
-                        (f.MaxShrinkByFs < needed ? $", dont seulement {Facts.Gb(f.MaxShrinkByFs)} récupérables" : "") +
-                        "). Libérez de la place (Paramètres → Système → Stockage), puis relancez IXIN OS Setup."));
+                    long shrinkNeeded = MinIxin + SetupSizeFor(DefaultIsoSize);
+                    long needed = shrinkNeeded + KeepWindowsFree + DefaultIsoSize;
+                    if (f.Free >= needed)
+                        list.Add(new Check(CheckLevel.Blocking, f.DriveLetter + ": ne peut pas être réduit assez",
+                            $"Windows a assez d'espace libre ({Facts.Gb(f.Free)}), mais des fichiers système impossibles à déplacer " +
+                            "(mise en veille prolongée, fichier d'échange, points de restauration) se trouvent en fin de disque : " +
+                            $"Windows ne peut être réduit que de {Facts.Gb(f.MaxShrinkByFs)} (il faut {Facts.Gb(shrinkNeeded)}). " +
+                            "Cliquez sur « Débloquer la réduction » ; si cela ne suffit pas, l'aide explique les étapes suivantes.")
+                        { UnmovableFiles = true });
+                    else
+                        list.Add(new Check(CheckLevel.Blocking, "Espace libre insuffisant sur " + f.DriveLetter + ":",
+                            $"Il faut environ {Facts.Gb(needed)} libres sur Windows ({Facts.Gb(f.Free)} actuellement). " +
+                            "Libérez de la place (Paramètres → Système → Stockage), puis relancez IXIN OS Setup."));
                 }
                 else
                 {

@@ -123,12 +123,31 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
 - Steps: Welcome → Location → Keyboard → **Partitions** → User → Summary → Install → Finish.
 - Partitioning options: **"Install alongside Windows"** (automatic Windows shrinking, offered when Windows is detected),
   **"Erase disk"**, or **manual partitioning**.
-- Layout: **1 GB EFI** partition (boot) + **Btrfs** system (subvolumes `@`, `@home`, `@cache`, `@log`,
-  compatible with Timeshift snapshots), with optional **LUKS2** encryption.
+- Layout: EFI partition (512 MB, or the existing Windows one) + separate **1 GB `/boot`** (ext4, holds the kernel)
+  + **Btrfs** system (subvolumes `@`, `@home`, `@cache`, `@log`, compatible with Timeshift snapshots), with optional
+  **LUKS2** encryption. Windows partitions (NTFS / BitLocker) can never be selected for replacement.
 - **GRUB** bootloader with **automatic Windows detection** (dual-boot menu).
 - Requirements: 64-bit (x86_64) PC with **UEFI** (legacy BIOS works for the live system), **4 GB RAM** minimum (8+ recommended), **40 GB** of disk.
 
-### Dual-boot guide with Windows (to put in the docs)
+### Install from Windows, without a USB stick: IXIN OS Setup
+- **IXIN-OS-Setup.exe** (published in each GitHub Release next to the ISO) runs on **Windows 10 / 11 (64-bit)**.
+  Requirements: **UEFI** boot with a **GPT** disk (nearly all PCs since 2012), about **75 GB free** on C:.
+- What it does, step by step (each step explained in the app, everything can be undone until IXIN OS is installed):
+  1. checks the PC (UEFI, disk, free space, BitLocker, Secure Boot, battery);
+  2. downloads the latest IXIN OS and verifies its **SHA-256** (or uses an ISO already downloaded);
+  3. if Windows is encrypted with **BitLocker**: shows the **recovery key** (to write down) and suspends
+     BitLocker for 3 reboots;
+  4. shrinks Windows by the chosen size, creates a 6 GB "IXIN-SETUP" partition holding the ISO, and adds an
+     "IXIN OS Setup" boot menu (Windows stays the default);
+  5. restarts directly into the IXIN OS installer (or into the UEFI settings first if **Secure Boot** must be turned off).
+- In the installer, "Replace a partition" is preselected: the user clicks the "Free space" area. Erasing the disk or
+  shrinking Windows again is refused in this mode. On first boot, IXIN OS removes the temporary partition and menu.
+- Limits: Secure Boot must be off (some Windows anti-cheat games require it), BIOS/MBR PCs must use a USB stick,
+  the program is not code-signed yet (Windows SmartScreen shows "More info → Run anyway").
+- Full user guide (French): `docs/INSTALLATION-WINDOWS.md` in the repository — good material for an
+  "Install from Windows" page on the site.
+
+### Dual-boot guide with Windows using a USB stick (to put in the docs)
 1. In Windows: turn off **Fast Startup** and **suspend BitLocker** if the disk is encrypted.
 2. Write the ISO to a USB stick with **Rufus** (GPT / UEFI) or **Ventoy**.
 3. In the BIOS / UEFI: **disable Secure Boot** (IXIN OS does not yet provide a signed bootloader), then boot from the stick.
@@ -162,6 +181,7 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
   The IXIN app on Android is the ecosystem's answer for phones.
 - ❌ **Mac with Apple Silicon (M1–M4)**: not supported. Intel Macs: possible, but not tested.
 - ❌ **Secure Boot**: must be disabled (signing planned for a later version).
+- ✅ **Install from Windows** (IXIN OS Setup): Windows 10 / 11 64-bit, UEFI + GPT disk.
 
 ## 8. Downloads
 
@@ -176,6 +196,8 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
   Options: host the full ISO on object storage (Cloudflare R2, Backblaze B2, a CDN) and add a **torrent** link,
   showing the size, version, date and SHA-256 hash on the download page.
 - Writing the ISO to a USB stick: **Ventoy** (recommended) or **Rufus** (Windows), **balenaEtcher** (Windows / Mac / Linux).
+- **IXIN-OS-Setup.exe** (about 4 MB) is attached to each release from now on: for Windows users it is the simplest
+  download (no reassembly, no USB stick). It always fetches the latest release itself.
 
 ## 9. Project status (to stay honest on the site)
 
@@ -184,7 +206,7 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
   graphical installer ✅, full encrypted install ✅, **reboot of the installed system ✅** (GRUB → IXIN unlock screen →
   login → desktop; firewall, AppArmor, LUKS2 and encrypted DNS checked on the installed system).
   Several bugs found during these tests have been fixed (missing `unsquashfs`, installer readability,
-  GRUB unable to read the kernel on encrypted Btrfs; the latter was fixed by moving `/boot` to the EFI partition).
+  GRUB unable to read the kernel on encrypted Btrfs; fixed with a separate unencrypted `/boot` partition).
 - ⚠️ The **first published release (`build-2026.10.15-1`)** predates the GRUB fix: an install from it
   may fail to boot. Use the **next** build (`build-2026.10.15-2` or later).
 - Not tested on real hardware yet (VM only): label it **"Beta"** on the site.
@@ -194,8 +216,10 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
 - ⚠️ Releases `build-2026.10.15-1` and `-2` predate IXIN Update. PCs installed from them enable it with
   `tools/ixin-enable-updates.sh` (see docs/MISES-A-JOUR.md); the next ISO, built once the IXIN signing key
   is configured on GitHub, includes it.
+- IXIN OS Setup (Windows): tested on every change on a real Windows 11 (GitHub Actions) with a virtual disk —
+  full preparation then full undo, boot menu entry. Not yet tested on a range of real PCs: call it **"Beta"** as well.
 - Ideas for later versions: Secure Boot signing, an optional "macOS-style" layout (dock), an optional security toolbox,
-  a Windows helper that prepares the USB stick, a dedicated package repository, translations.
+  code signing for IXIN OS Setup, a dedicated package repository, translations.
 
 ## 10. Suggested structure for os.ixin.online
 

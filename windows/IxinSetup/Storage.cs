@@ -32,6 +32,21 @@ Resize-Partition -DriveLetter $Letter -Size $NewSize
             return Ps.Long(o, "Size");
         }
 
+        /// <summary>
+        /// Lève les blocages les plus courants de la réduction de Windows : le fichier de mise en veille
+        /// prolongée (hiberfil.sys, impossible à déplacer) est supprimé, puis l'espace libre est regroupé
+        /// au début du volume (comme « Optimiser les lecteurs »). Renvoie false si une étape a échoué.
+        /// </summary>
+        public static bool UnblockShrink(string letter, bool hibernation = true)
+        {
+            bool ok = true;
+            if (hibernation)
+                ok &= BootEntry.Exec("powercfg.exe", "/hibernate off", out _) == 0;
+            ok &= BootEntry.Exec("defrag.exe", letter + ": /X", out string report) == 0;
+            Log.Info("Regroupement de l'espace libre :\n" + report.Trim());
+            return ok;
+        }
+
         /// <summary>Rend à Windows tout l'espace libre situé juste après sa partition.</summary>
         public static long ExtendToMax(string letter)
         {

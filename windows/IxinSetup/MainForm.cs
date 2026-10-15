@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -137,7 +138,7 @@ namespace IxinSetup
 
         private async Task Analyse()
         {
-            ShowPage(Busy("Analyse du PC…", "Lecture du disque de Windows, de BitLocker et de Secure Boot."));
+            ShowPage(Busy("Analyse du PC…", "Lecture du disque de Windows, de BitLocker et de Secure Boot (jusqu'à une minute)."));
             try
             {
                 string drive = (Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").Substring(0, 1);
@@ -174,10 +175,41 @@ namespace IxinSetup
             var checks = Plan.Checks(facts, state);
             foreach (var c in checks) col.Controls.Add(CheckRow(c));
             bool blocked = checks.Any(c => c.Level == CheckLevel.Blocking);
-            ShowPage(col,
+            var buttons = new List<Button>
+            {
                 Action("Continuer", ShowOptions, primary: true, enabled: !blocked),
                 Action("Quitter", Close),
-                Action("Aide", () => Open(HelpUrl)));
+                Action("Aide", () => Open(HelpUrl)),
+            };
+            if (checks.Any(c => c.UnmovableFiles))
+                buttons.Insert(1, Action("Débloquer la réduction", async () => await UnblockShrink()));
+            ShowPage(col, buttons.ToArray());
+        }
+
+        private async Task UnblockShrink()
+        {
+            string drive = facts.DriveLetter;
+            if (MessageBox.Show(
+                    "IXIN OS Setup va :\n\n" +
+                    "• désactiver la mise en veille prolongée de Windows (le fichier hiberfil.sys est supprimé ; " +
+                    "elle est de toute façon déconseillée avec deux systèmes sur le PC) ;\n" +
+                    $"• optimiser le lecteur {drive}: pour regrouper l'espace libre (quelques minutes sur un SSD, " +
+                    "jusqu'à une heure sur un disque dur).\n\nVos fichiers ne sont pas modifiés. Continuer ?",
+                    "IXIN OS Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+            ShowPage(Busy("Déblocage de la réduction…", $"Optimisation du lecteur {drive}: — vous pouvez continuer à utiliser le PC."));
+            try
+            {
+                bool ok = await Task.Run(() => Storage.UnblockShrink(drive));
+                if (!ok) Log.Warn("Déblocage de la réduction : une étape a échoué (voir ci-dessus)");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.ToString());
+                ShowError(ex.Message);
+                return;
+            }
+            await Analyse();
         }
 
         private static Control CheckRow(Check c)

@@ -130,7 +130,7 @@ $esp = Get-Partition -DiskNumber $p.DiskNumber | Where-Object { $_.GptType -eq '
             sb.AppendLine("Windows : " + WindowsName);
             sb.AppendLine("UEFI : " + IsUefi + " ; Secure Boot : " + (SecureBoot?.ToString() ?? "inconnu"));
             sb.AppendLine($"Disque {DiskNumber} « {DiskName} » ({PartitionStyle}, {Gb(DiskSize)})");
-            sb.AppendLine($"{DriveLetter}: partition {PartitionNumber}, {Gb(Size)}, libre {Gb(Free)}, réductible jusqu'à {Gb(SizeMin)}");
+            sb.AppendLine($"{DriveLetter}: partition {PartitionNumber}, {Gb(Size)}, libre {Gb(Free)}, réduction possible {Gb(MaxShrinkByFs)}");
             sb.AppendLine($"Partition EFI : n°{EspPartitionNumber} ({Gb(EspSize)})");
             sb.AppendLine("BitLocker : " + BitLocker.Describe());
             sb.AppendLine("Batterie : " + (HasBattery ? (OnBattery ? "sur batterie " : "sur secteur ") + BatteryPercent + " %" : "aucune"));
