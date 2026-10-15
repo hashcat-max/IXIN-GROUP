@@ -1,0 +1,44 @@
+--- a/src/modules/partition/core/PartUtils.cpp
++++ b/src/modules/partition/core/PartUtils.cpp
+@@ -29,6 +29,7 @@
+ #include <kpmcore/core/device.h>
+ #include <kpmcore/core/partition.h>
+ 
++#include <QFile>
+ #include <QProcess>
+ #include <QTemporaryDir>
+ 
+@@ -129,6 +130,18 @@
+     }
+ }
+ 
++/// IXIN OS : système live démarré par IXIN OS Setup (installation lancée depuis Windows) ?
++static bool
++ixinSetupFromWindows()
++{
++    QFile cmdline( QStringLiteral( "/proc/cmdline" ) );
++    if ( !cmdline.open( QIODevice::ReadOnly ) )
++    {
++        return false;
++    }
++    return cmdline.readAll().simplified().split( ' ' ).contains( QByteArrayLiteral( "ixin.setup=windows" ) );
++}
++
+ bool
+ canBeResized( Partition* candidate, const Logger::Once& o )
+ {
+@@ -138,6 +151,14 @@
+         return false;
+     }
+ 
++    // IXIN OS : depuis Windows, IXIN OS Setup a déjà libéré l'espace (Windows réduit par ses propres
++    // outils) : aucune partition n'est proposée à une nouvelle réduction (« Installer à côté »).
++    if ( ixinSetupFromWindows() )
++    {
++        cDebug() << o << "Can not resize" << convenienceName( candidate ) << ", the free space was prepared by IXIN OS Setup";
++        return false;
++    }
++
+     if ( !candidate->fileSystem().supportGrow() || !candidate->fileSystem().supportShrink() )
+     {
+         cDebug() << o << "Can not resize" << convenienceName( candidate ) << ", filesystem"
