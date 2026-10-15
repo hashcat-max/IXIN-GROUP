@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+import traceback
 from pathlib import Path
 
 from PyQt6.QtCore import QFileSystemWatcher, QLockFile, QProcess, QTimer
@@ -54,7 +55,6 @@ class Notifier:
         self.app = app
         self.seen = self.load_seen()
         self.status = {}
-        self.procs = []
 
         self.tray = QSystemTrayIcon(icon("ixin"))
         self.tray.setToolTip(APP)
@@ -127,14 +127,14 @@ class Notifier:
         for key, label in (actions or {}).items():
             cmd.append(f"--action={key}={label}")
         cmd += [title, body]
-        proc = QProcess()
+        # Parent Qt : le processus vit jusqu'à sa fin même sans référence Python.
+        proc = QProcess(self.app)
         proc.finished.connect(lambda *_: self.on_action(proc))
         proc.start("notify-send", cmd)
-        self.procs.append(proc)
 
     def on_action(self, proc):
         key = bytes(proc.readAllStandardOutput()).decode().strip()
-        self.procs = [p for p in self.procs if p is not proc]
+        proc.deleteLater()
         if key == "reboot":
             self.reboot()
         elif key == "install":
@@ -176,6 +176,10 @@ class Notifier:
                                     {"reboot": "Redémarrer maintenant", "open": "Plus tard"})
                     else:
                         self.notify("Mises à jour installées", body + ".", "system-software-update")
+                elif last.get("result") == "repaired":
+                    self.notify("Installation réparée",
+                                "Le PC s'était éteint pendant une mise à jour : IXIN Update l'a terminée correctement.",
+                                "system-software-update")
                 elif last.get("result") == "failed":
                     self.notify("Échec de la mise à jour",
                                 "Les mises à jour n'ont pas pu être installées. Votre système n'a pas été modifié ; "
@@ -235,9 +239,16 @@ class Notifier:
         self.tray.setVisible(visible)
 
 
+def log_exception(exc_type, exc, tb):
+    # Une erreur inattendue est journalisée au lieu d'arrêter le notificateur (PyQt6 appelle
+    # qFatal() sur une exception non gérée si sys.excepthook n'est pas redéfini).
+    sys.stderr.write("".join(traceback.format_exception(exc_type, exc, tb)))
+
+
 def main():
     if Path("/run/archiso").exists():
         return 0          # système live : pas de mises à jour
+    sys.excepthook = log_exception
     runtime = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
     lock = QLockFile(os.path.join(runtime, "ixin-update-notifier.lock"))
     if not lock.tryLock(100):

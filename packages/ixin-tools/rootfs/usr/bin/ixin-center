@@ -5,6 +5,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import traceback
 from pathlib import Path
 
 from PyQt6.QtCore import QFileSystemWatcher, Qt, QTimer, QUrl
@@ -292,7 +293,7 @@ class UpdatesTab(QWidget):
             QListWidgetItem(label, self.list)
         if not updates:
             for entry in (st.get("history") or [])[:8]:
-                ok = entry.get("result") == "ok"
+                ok = entry.get("result") in ("ok", "repaired")
                 txt = (f"{'✔' if ok else '✘'}  {short_date(entry.get('date'))} — {entry.get('count', 0)} paquet(s)"
                        + (f", {entry['security']} correctif(s) de sécurité" if entry.get("security") else "")
                        + f"  [{entry.get('reason', '')}]")
@@ -479,6 +480,8 @@ class Center(QMainWindow):
 
 
 def main():
+    # Une erreur inattendue est affichée dans le journal au lieu de fermer le Centre IXIN.
+    sys.excepthook = lambda t, e, tb: sys.stderr.write("".join(traceback.format_exception(t, e, tb)))
     welcome = "--welcome" in sys.argv
     if welcome and NO_WELCOME.exists():
         return 0

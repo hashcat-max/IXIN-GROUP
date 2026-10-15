@@ -3,5 +3,9 @@ Autolock=true
 LockOnResume=true
 Timeout=10
 
+[Greeter]
+WallpaperPlugin=org.kde.image
+
 [Greeter][Wallpaper][org.kde.image][General]
-Image=/usr/share/ixin/wallpapers/ixin-void.png
+Image=file:///usr/share/ixin/wallpapers/ixin-void.png
+PreviewImage=file:///usr/share/ixin/wallpapers/ixin-void.png
