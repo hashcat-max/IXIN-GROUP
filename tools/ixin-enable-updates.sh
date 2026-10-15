@@ -67,5 +67,10 @@ pacman -Sy --noconfirm --needed \
   --overwrite '/usr/share/applications/ixin-*' --overwrite '/usr/share/pacman/keyrings/ixin*' \
   ixin-desktop
 
+# Installeur de la bêta resté sur le PC (inutile en dehors du système live)
+for f in /usr/local/bin/ixin-install /usr/local/bin/ixin-postinstall; do
+  if [[ -e "$f" ]] && ! pacman -Qqo "$f" &>/dev/null; then rm -f "$f"; fi
+done
+
 systemctl enable --now ixin-update.timer >/dev/null
 msg "Terminé : IXIN Update est actif (Centre IXIN → Mises à jour)."

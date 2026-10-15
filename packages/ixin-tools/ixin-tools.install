@@ -1,6 +1,7 @@
 # Copies laissées par la première bêta (dans /usr/local/bin, prioritaires dans le PATH).
-_legacy=(usr/local/bin/ixin-center usr/local/bin/ixin-secure usr/local/bin/ixin-gaming usr/local/bin/ixin-update
-         usr/local/bin/ixin-install usr/local/bin/ixin-postinstall)
+# Ne pas y ajouter ixin-install / ixin-postinstall : ce paquet est aussi installé pendant la
+# construction de l'ISO, où ces deux fichiers sont l'installeur du système live.
+_legacy=(usr/local/bin/ixin-center usr/local/bin/ixin-secure usr/local/bin/ixin-gaming usr/local/bin/ixin-update)
 
 post_install() {
   local f
