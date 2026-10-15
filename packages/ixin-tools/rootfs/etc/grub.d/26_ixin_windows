@@ -1,0 +1,3 @@
+#!/bin/sh
+# IXIN OS — entrée « Windows » du menu de démarrage (voir /usr/lib/ixin/ixin-grub-windows)
+exec /usr/lib/ixin/ixin-grub-windows --menu

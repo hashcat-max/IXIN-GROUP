@@ -1,0 +1,66 @@
+#!/bin/sh
+# IXIN OS — entrée « Windows » du menu de démarrage (GRUB)
+#
+# Windows installé sur la partition EFI partagée avec IXIN OS démarre par sa propre entrée
+# du firmware (BootNext, puis redémarrage) : exactement comme sans IXIN, si bien que BitLocker
+# ne demande pas sa clé de récupération — ce qu'il fait souvent quand GRUB lance lui-même le
+# chargeur de Windows. Sans entrée du firmware, GRUB lance Windows directement.
+#
+#   --menu        l'entrée du menu (appelé par /etc/grub.d/26_ixin_windows)
+#   --skip-list   ce Windows, pour qu'os-prober ne l'ajoute pas une seconde fois
+#                 (/etc/default/grub.d/ixin-windows.cfg)
+set -u
+LOADER=/EFI/Microsoft/Boot/bootmgfw.efi
+
+# Partition EFI montée contenant le chargeur de Windows (vfat : noms insensibles à la casse)
+dev=""
+for mp in /boot/efi /efi /boot; do
+    [ "$(findmnt -no FSTYPE --mountpoint "$mp" 2>/dev/null)" = vfat ] || continue
+    [ -f "$mp$LOADER" ] || continue
+    dev="$(findmnt -no SOURCE --mountpoint "$mp")"
+    break
+done
+[ -b "$dev" ] || exit 0
+uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null)"
+[ -n "$uuid" ] || exit 0
+
+case "${1:-}" in
+--skip-list)
+    echo "$uuid@$LOADER"
+    ;;
+--menu)
+    [ -d /sys/firmware/efi ] || exit 0
+    partuuid="$(blkid -s PARTUUID -o value "$dev" 2>/dev/null | tr 'A-Z' 'a-z')"
+    num=""
+    if [ -n "$partuuid" ] && command -v efibootmgr >/dev/null 2>&1; then
+        # Le chemin s'affiche « \EFI\... » ou « File(\EFI\...) » selon la version d'efibootmgr
+        num="$(efibootmgr -v 2>/dev/null | tr 'A-Z\\' 'a-z/' |
+            sed -n "s|^boot\([0-9a-f]\{4\}\)\*\{0,1\} .*gpt,$partuuid,.*/efi/microsoft/boot/bootmgfw\.efi.*|\1|p" |
+            head -n 1)"
+    fi
+    if [ -n "$num" ]; then
+        echo "IXIN : entrée « Windows » (démarrage par l'entrée Boot$num du firmware)" >&2
+    else
+        echo "IXIN : entrée « Windows » (lancé par GRUB)" >&2
+    fi
+    cat <<GRUB
+menuentry 'Windows' --class windows --class os \$menuentry_id_option 'ixin-windows-$uuid' {
+	insmod part_gpt
+	insmod fat
+GRUB
+    if [ -n "$num" ]; then
+        cat <<GRUB
+	insmod efibootnext
+	if bootnext $num; then
+		reboot
+	fi
+GRUB
+    fi
+    cat <<GRUB
+	search --no-floppy --fs-uuid --set=root $uuid
+	chainloader $LOADER
+}
+GRUB
+    ;;
+esac
+exit 0

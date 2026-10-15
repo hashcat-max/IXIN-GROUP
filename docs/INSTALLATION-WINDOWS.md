@@ -52,8 +52,10 @@ IXIN OS Setup vérifie tout cela lui-même et explique ce qui bloque.
 
    Pour protéger Windows, effacer le disque ou réduire de nouveau Windows est refusé dans ce mode,
    et une partition Windows ne peut jamais être choisie pour être remplacée.
-9. Terminez l'installation (nom, mot de passe), puis redémarrez. Au démarrage, le menu propose
-   **IXIN OS** et **Windows Boot Manager**.
+9. Terminez l'installation (nom, mot de passe), puis redémarrez. Au démarrage, le menu IXIN propose
+   **IXIN OS**, **Windows** et les paramètres du firmware (UEFI). Choisir **Windows** redémarre
+   aussitôt le PC directement sur Windows, par son entrée du firmware, exactement comme si IXIN
+   n'était pas là : BitLocker ne demande pas sa clé de récupération.
 
 Au premier démarrage d'IXIN OS, la partition « IXIN-SETUP » (6 Go) et le menu « IXIN OS Setup »
 sont supprimés automatiquement. Pour rendre ces 6 Go à Windows : relancez IXIN OS Setup sous
