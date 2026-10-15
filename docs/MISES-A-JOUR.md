@@ -138,9 +138,14 @@ mises à jour continuent, mais sans blocages ni messages IXIN).
 | Clé privée | uniquement dans les secrets GitHub (jamais dans le dépôt) |
 | Dépôts Arch / Chaotic-AUR | signatures de leurs mainteneurs (trousseaux `archlinux-keyring`, `chaotic-keyring` mis à jour en premier) |
 
-Testé en machine virtuelle sur un IXIN OS installé : politique falsifiée → rejetée ; ancienne
-politique correctement signée → rejetée ; base du dépôt modifiée → dépôt ignoré, correctifs Arch
-maintenus ; mise à jour IXIN urgente → installée automatiquement avec point de restauration.
+Testé en machine virtuelle :
+- **installation complète depuis l'ISO** (disque chiffré) : au premier démarrage, point de restauration
+  initial puis mises à jour installées automatiquement ; mises à jour IXIN poussées en « urgent »
+  → installées toutes seules, avec point de restauration, notification et annonce IXIN ; le
+  notificateur se met lui-même à jour sans fermer la session ;
+- sur une bêta migrée : politique falsifiée → rejetée ; ancienne politique correctement signée →
+  rejetée ; base du dépôt modifiée → dépôt ignoré, correctifs Arch maintenus ; coupure de courant
+  pendant une mise à jour → installation réparée au démarrage suivant.
 
 ---
 

@@ -188,8 +188,12 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
 - ⚠️ The **first published release (`build-2026.10.15-1`)** predates the GRUB fix: an install from it
   may fail to boot. Use the **next** build (`build-2026.10.15-2` or later).
 - Not tested on real hardware yet (VM only): label it **"Beta"** on the site.
-- IXIN Update tested in a VM: automatic search and install, restore point, urgent IXIN push received automatically,
-  forged policy / replayed policy / tampered repo database all rejected.
+- IXIN Update tested in a VM, including a full install from the ISO: restore point on first boot, automatic
+  updates, urgent IXIN pushes installed automatically (restore point, notification, IXIN announcement),
+  forged policy / replayed policy / tampered repo database all rejected, repair after a power cut mid-update.
+- ⚠️ Releases `build-2026.10.15-1` and `-2` predate IXIN Update. PCs installed from them enable it with
+  `tools/ixin-enable-updates.sh` (see docs/MISES-A-JOUR.md); the next ISO, built once the IXIN signing key
+  is configured on GitHub, includes it.
 - Ideas for later versions: Secure Boot signing, an optional "macOS-style" layout (dock), an optional security toolbox,
   a Windows helper that prepares the USB stick, a dedicated package repository, translations.
 
