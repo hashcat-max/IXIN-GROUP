@@ -1,0 +1,23 @@
+--- a/src/modules/partition/gui/PartitionLabelsView.cpp
++++ b/src/modules/partition/gui/PartitionLabelsView.cpp
+@@ -373,7 +373,10 @@
+                                 const QPoint& pos,
+                                 bool selected )
+ {
+-    painter->setPen( Qt::black );
++    // IXIN OS : couleur du texte du thème (le noir fixe était illisible sur un thème sombre,
++    // notamment « Espace libre », la zone à choisir lors d'une installation depuis Windows).
++    const QColor textColor = QGuiApplication::palette().color( QPalette::WindowText );
++    painter->setPen( textColor );
+     int vertOffset = 0;
+     int width = 0;
+     for ( const QString& textLine : text )
+@@ -395,7 +398,7 @@
+         drawSelectionSquare( painter, partitionSquareRect.adjusted( 2, 2, -2, -2 ), color );
+     }
+ 
+-    painter->setPen( Qt::black );
++    painter->setPen( textColor );
+ }
+ 
+ QModelIndex
