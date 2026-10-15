@@ -1,0 +1,78 @@
+name: Installeur Windows (IXIN OS Setup)
+
+# Construit IXIN-OS-Setup.exe (installation d'IXIN OS à côté de Windows) et le teste sur un
+# vrai Windows : préparation complète puis annulation sur un disque virtuel (VHDX), et
+# création / suppression d'une entrée de démarrage du firmware. Réutilisé par la construction
+# de l'ISO pour joindre IXIN-OS-Setup.exe à chaque version publiée.
+
+on:
+  push:
+    paths:
+      - "windows/**"
+      - "tools/build-windows-boot.sh"
+      - ".github/workflows/windows-setup.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - "tools/build-windows-boot.sh"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  boot:
+    name: Chargeur de démarrage (GRUB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire grubx64.efi (conteneur Arch Linux)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/src archlinux:latest bash -c '
+            set -e
+            pacman -Sy --noconfirm --needed grub >/dev/null
+            /src/tools/build-windows-boot.sh /src/build/windows-boot'
+          sudo chown -R "$USER" build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-boot
+          path: build/windows-boot/
+
+  setup:
+    name: IXIN-OS-Setup.exe (compilation + auto-test sur Windows)
+    needs: boot
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-boot
+          path: build/windows-boot
+      - name: Compiler
+        run: dotnet build windows/IxinSetup/IxinSetup.csproj -c Release -nologo
+      - name: Auto-test sur disque virtuel (préparation + annulation)
+        shell: powershell
+        run: |
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--self-test", "$env:RUNNER_TEMP\ixin-selftest" -Wait -PassThru -NoNewWindow
+          Write-Host "---- journal ----"
+          Get-Content "$env:ProgramData\IXIN\setup.log" -Encoding UTF8 -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "Auto-test échoué (code $($p.ExitCode))" }
+      - name: Test de l'entrée de démarrage du firmware (machine jetable)
+        shell: powershell
+        run: |
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--self-test-boot-entry" -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "Test de l'entrée de démarrage échoué (code $($p.ExitCode))" }
+      - name: Informations sur la machine de test
+        if: always()
+        shell: powershell
+        run: |
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
+          Start-Process -FilePath $exe -ArgumentList "--facts" -Wait -NoNewWindow
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ixin-os-setup
+          path: windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe

@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- IXIN OS Setup : installe IXIN OS à côté de Windows (programme Windows, .NET Framework 4.8,
+       présent d'origine sur Windows 10 et 11 : un seul fichier .exe, rien d'autre à installer). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>IXIN-OS-Setup</AssemblyName>
+    <RootNamespace>IxinSetup</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\ixin.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Product>IXIN OS Setup</Product>
+    <Company>IXIN Group</Company>
+    <Copyright>IXIN Group</Copyright>
+    <Description>Installe IXIN OS à côté de Windows</Description>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Chargeur de démarrage de l'installation (tools/build-windows-boot.sh) -->
+    <GrubEfi Condition="'$(GrubEfi)' == ''">$(MSBuildThisFileDirectory)..\..\build\windows-boot\grubx64.efi</GrubEfi>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Compilation possible hors de Windows ; à l'exécution, PowerShell 5.1 de Windows est utilisé -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.PowerShell.5.1.ReferenceAssemblies" Version="1.0.0" PrivateAssets="all" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(GrubEfi)" LogicalName="grubx64.efi" />
+    <EmbeddedResource Include="Assets\ixin-logo-64.png" LogicalName="ixin-logo-64.png" />
+  </ItemGroup>
+
+  <Target Name="CheckGrubEfi" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(GrubEfi)')" Text="grubx64.efi introuvable ($(GrubEfi)) : lancez d'abord tools/build-windows-boot.sh" />
+  </Target>
+</Project>

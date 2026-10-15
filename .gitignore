@@ -1,2 +1,4 @@
 build/
 out/
+windows/IxinSetup/bin/
+windows/IxinSetup/obj/

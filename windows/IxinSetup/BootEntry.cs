@@ -1,0 +1,182 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace IxinSetup
+{
+    /// <summary>
+    /// Menu de démarrage de l'installation : chargeur GRUB dans la partition EFI de Windows
+    /// (\EFI\IXIN-SETUP\grubx64.efi) et entrée « IXIN OS Setup » du firmware (via bcdedit).
+    /// </summary>
+    internal static class BootEntry
+    {
+        public const string Description = "IXIN OS Setup";
+        public const string EspDirectory = @"EFI\IXIN-SETUP";
+        public const string LoaderPath = @"\EFI\IXIN-SETUP\grubx64.efi";
+        private static readonly Regex Guid = new Regex(@"\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}");
+
+        // ── outils ────────────────────────────────────────────────────────────
+
+        public static string Run(string exe, string args, bool check = true)
+        {
+            var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, exe), args)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            using (var p = Process.Start(psi))
+            {
+                string output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
+                p.WaitForExit();
+                Log.Info($"{exe} {args} → {p.ExitCode}");
+                if (check && p.ExitCode != 0)
+                    throw new SetupException($"La commande « {exe} {args} » a échoué : {output.Trim()}");
+                return output;
+            }
+        }
+
+        public static string FreeDriveLetter()
+        {
+            var used = new HashSet<char>(DriveInfo.GetDrives().Select(d => char.ToUpperInvariant(d.Name[0])));
+            for (char c = 'Z'; c >= 'G'; c--)
+            {
+                if (!used.Contains(c)) return c.ToString();
+            }
+            throw new SetupException("Aucune lettre de lecteur libre pour accéder à la partition EFI.");
+        }
+
+        // ── partition EFI ─────────────────────────────────────────────────────
+
+        /// <summary>Monte la partition EFI qui a servi à démarrer Windows (mountvol /S).</summary>
+        public static string MountSystemEsp()
+        {
+            string letter = FreeDriveLetter();
+            Run("mountvol.exe", letter + ": /S");
+            return letter;
+        }
+
+        public static void Unmount(string letter)
+        {
+            Run("mountvol.exe", letter + ": /D", check: false);
+        }
+
+        public static byte[] Loader()
+        {
+            using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("grubx64.efi"))
+            {
+                if (s == null) throw new SetupException("Chargeur de démarrage absent du programme.");
+                using (var ms = new MemoryStream())
+                {
+                    s.CopyTo(ms);
+                    return ms.ToArray();
+                }
+            }
+        }
+
+        public static void InstallLoader(string espLetter)
+        {
+            string dir = espLetter + @":\" + EspDirectory;
+            byte[] loader = Loader();
+            var drive = new DriveInfo(espLetter);
+            if (drive.AvailableFreeSpace < loader.Length + (2 << 20))
+                throw new SetupException($"La partition EFI est pleine ({Facts.Gb(drive.AvailableFreeSpace)} libres).");
+            Directory.CreateDirectory(dir);
+            File.WriteAllBytes(Path.Combine(dir, "grubx64.efi"), loader);
+            File.WriteAllText(Path.Combine(dir, "LISEZMOI.txt"),
+                "Menu de démarrage de l'installation d'IXIN OS, ajouté par IXIN OS Setup.\r\n" +
+                "Il est supprimé automatiquement après l'installation, ou par « Annuler la préparation »\r\n" +
+                "dans IXIN OS Setup.\r\n", Encoding.UTF8);
+            using (var sha = SHA256.Create())
+            {
+                if (!sha.ComputeHash(File.ReadAllBytes(Path.Combine(dir, "grubx64.efi"))).SequenceEqual(sha.ComputeHash(loader)))
+                    throw new SetupException("La copie du chargeur de démarrage dans la partition EFI est incorrecte.");
+            }
+            Log.Info("Chargeur installé dans la partition EFI : " + dir);
+        }
+
+        public static void RemoveLoader(string espLetter)
+        {
+            string dir = espLetter + @":\" + EspDirectory;
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+                Log.Info("Chargeur retiré : " + dir);
+            }
+        }
+
+        // ── entrée du firmware ────────────────────────────────────────────────
+
+        /// <summary>Crée l'entrée « IXIN OS Setup » dans le menu de démarrage du firmware.</summary>
+        public static string Create()
+        {
+            foreach (var old in Find()) Delete(old);
+            string output = Run("bcdedit.exe", $"/copy {{bootmgr}} /d \"{Description}\"");
+            var m = Guid.Match(output);
+            if (!m.Success) throw new SetupException("Identifiant de la nouvelle entrée de démarrage introuvable : " + output.Trim());
+            string id = m.Value;
+            try
+            {
+                Run("bcdedit.exe", $"/set {id} path {LoaderPath}");
+                Run("bcdedit.exe", $"/set {{fwbootmgr}} displayorder {id} /addlast");
+            }
+            catch
+            {
+                Delete(id);
+                throw;
+            }
+            Log.Info("Entrée de démarrage créée : " + id);
+            return id;
+        }
+
+        /// <summary>Entrées existantes qui démarrent le chargeur d'IXIN OS Setup.</summary>
+        public static List<string> Find()
+        {
+            string output = Run("bcdedit.exe", "/enum firmware /v", check: false);
+            return ParseEntries(output);
+        }
+
+        /// <summary>
+        /// Cherche dans la sortie de bcdedit les blocs dont le chemin est celui de notre chargeur
+        /// (les noms des champs sont traduits selon la langue de Windows, pas les valeurs).
+        /// </summary>
+        public static List<string> ParseEntries(string bcdeditOutput)
+        {
+            var ids = new List<string>();
+            foreach (var block in Regex.Split(bcdeditOutput.Replace("\r", ""), @"\n\s*\n"))
+            {
+                if (block.IndexOf(LoaderPath, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                var m = Guid.Match(block);
+                if (m.Success && !ids.Contains(m.Value)) ids.Add(m.Value);
+            }
+            return ids;
+        }
+
+        public static void Delete(string id)
+        {
+            Run("bcdedit.exe", $"/delete {id}", check: false);
+            Log.Info("Entrée de démarrage supprimée : " + id);
+        }
+
+        /// <summary>Au prochain démarrage seulement, lancer IXIN OS Setup (sans changer l'ordre habituel).</summary>
+        public static void BootNextOnce(string id)
+        {
+            Run("bcdedit.exe", $"/set {{fwbootmgr}} bootsequence {id}");
+        }
+
+        public static void Restart(bool toFirmwareSettings)
+        {
+            string args = toFirmwareSettings
+                ? "/r /fw /t 5 /c \"Redémarrage vers les paramètres UEFI pour désactiver Secure Boot\""
+                : "/r /t 5 /c \"Redémarrage vers l'installation d'IXIN OS\"";
+            Run("shutdown.exe", args);
+        }
+    }
+}

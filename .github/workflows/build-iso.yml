@@ -18,7 +18,13 @@ permissions:
   contents: write
 
 jobs:
+  windows-setup:
+    # IXIN-OS-Setup.exe (installation depuis Windows), construit et testé avant l'ISO :
+    # une version publiée est immuable, tout doit y être joint dès sa création.
+    uses: ./.github/workflows/windows-setup.yml
+
   iso:
+    needs: windows-setup
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
@@ -65,6 +71,13 @@ jobs:
           split -b 1900M -d -a 2 "$ISO" "$ISO.part"
           ls -lh
 
+      - name: Récupérer IXIN-OS-Setup.exe
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release
+        uses: actions/download-artifact@v4
+        with:
+          name: ixin-os-setup
+          path: /mnt/ixin/out
+
       - name: Publier la Release
         if: startsWith(github.ref, 'refs/tags/') || inputs.release
         env:
@@ -76,6 +89,12 @@ jobs:
           cat > "$RUNNER_TEMP/notes.md" <<NOTES
           ## IXIN OS — ${ISO}
 
+          ### Installer à côté de Windows (le plus simple)
+          Téléchargez **IXIN-OS-Setup.exe** ci-dessous et lancez-le sous Windows 10 ou 11 : il vérifie le PC,
+          télécharge IXIN OS, prépare l'espace sur le disque et redémarre sur l'installation (sans clé USB).
+          Windows reste installé. Guide : docs/INSTALLATION-WINDOWS.md
+
+          ### Clé USB, machine virtuelle ou disque entier
           L'ISO est découpée en morceaux de 1,9 Go (limite GitHub). Pour la reconstituer :
 
           **Linux / macOS**
@@ -94,4 +113,4 @@ jobs:
           immédiatement, point de restauration avant chaque mise à jour.
           NOTES
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "IXIN OS $TAG" --notes-file "$RUNNER_TEMP/notes.md" \
-            "$ISO".part* "$ISO.sha256"
+            "$ISO".part* "$ISO.sha256" IXIN-OS-Setup.exe
