@@ -1,11 +1,30 @@
 # IXIN OS: complete context (to hand to another Claude project)
 
-> This document summarizes everything that has been built for **IXIN OS**. It is meant to
-> serve as the brief for building the site **os.ixin.online** (presentation, downloads,
-> documentation). Everything stated here has been built and tested unless explicitly
-> marked otherwise. Please do not invent features that are not listed here.
+> This document summarizes everything that has been built for **IXIN OS**. It is the brief for the site
+> **os.ixin.online** (presentation, downloads, documentation). Everything stated here exists and has been
+> tested, unless explicitly marked otherwise. **Please do not invent features that are not listed here.**
+>
+> **Last update: October 15, 2026 — current release `build-2026.10.15-3`.**
+> Companion file (French, ready to adapt into a page): `docs/INSTALLATION-WINDOWS.md`, the complete
+> "Installer IXIN OS à côté de Windows" user guide.
 
 ---
+
+## 0. What's new in `build-2026.10.15-3` (for a "Nouveautés" section)
+
+- **Install from Windows, without a USB stick**: new program **IXIN OS Setup** (`IXIN-OS-Setup.exe`, 3.7 MB,
+  Windows 10 / 11). It checks the PC, downloads IXIN OS, makes room on the disk and restarts into the installer.
+  Windows and its files stay in place; everything can be undone until IXIN OS is installed. (§5.1)
+- **Dual-boot menu**: at power-on, the IXIN menu offers **IXIN OS**, **Windows** and the firmware settings.
+  "Windows" restarts the PC straight into Windows through the PC's own firmware, exactly as without IXIN —
+  designed so that BitLocker does not ask for its recovery key. (§4)
+- **IXIN Update is built in**: automatic updates and security fixes, signed by the IXIN team. This is the
+  first release that includes it out of the box. (§4)
+- **Safer installer**: Windows partitions (NTFS / BitLocker) can never be erased or replaced by mistake; new disk
+  layout with a separate `/boot` partition, compatible with the small EFI partition of Windows PCs; the NTFS tools
+  needed to shrink Windows from a USB installation are included again.
+- Releases `build-2026.10.15-1` and `-2` are **obsolete** (no IXIN Update, no Windows installer, known boot issue on
+  `-1`): the site should only link to the **latest** release.
 
 ## 1. What IXIN OS is
 
@@ -15,9 +34,7 @@
   - **ixin.online**: the IXIN web app.
 - Positioning: **security · privacy · performance**. A system that is secure by default, comfortable for everyday use (the desktop looks like Windows), and capable of running Steam and Windows games.
 - Tagline used across the OS: **« Sécurité · Vie privée · Performance »**.
-- Source code: GitHub repository `hashcat-max/IXIN-GROUP`, branch `ccr-f4f50bff-01pzqi`.
-  ⚠️ If the repository is **private**, the GitHub download links will not work for the
-  public. In that case, make the repo public or host the ISO elsewhere (see §8).
+- Source code: public GitHub repository **`hashcat-max/IXIN-GROUP`** (default branch `ccr-f4f50bff-01pzqi`).
 
 ## 2. Visual identity (taken from getixin.com, to reuse as-is on the site)
 
@@ -44,17 +61,17 @@
 
 ## 3. Screenshots (real, taken in a VM during testing)
 
-In `docs/screenshots/`:
+In `docs/screenshots/` (1280×800, VM without 3D acceleration):
 - `bureau.png`: desktop with the Windows 11-style taskbar
 - `centre-ixin.png`: the IXIN Center application (welcome screen)
 - `menu-demarrage-live.png`: boot menu of the USB stick / ISO
+- `menu-demarrage-ixin-windows.png`: **dual-boot menu** of an installed PC (IXIN / Windows / UEFI Firmware Settings)
 - `deverrouillage-chiffrement.png`: IXIN boot screen asking for the encrypted disk password
 - `ecran-connexion.png`: login screen of the installed system
 - `ixin-secure.png`: security status in the terminal (installed system)
 - `grub-installe.png`: IXIN boot screen of the installed system
-- `installeur-emplacement.png`, `installeur-partitions-chiffrement.png`, `installeur-utilisateur.png`, `installeur-diaporama.png`: graphical installer
-
-(Screenshots at 1280×800, taken in a VM without 3D acceleration.)
+- `installeur-emplacement.png`, `installeur-utilisateur.png`, `installeur-diaporama.png`: graphical installer
+- ⚠️ `installeur-partitions-chiffrement.png` shows the **old** partition layout: do not use it on the site.
 
 ## 4. Features (what is actually in the OS)
 
@@ -69,11 +86,12 @@ In `docs/screenshots/`:
 - **French by default** (language, AZERTY keyboard, Europe/Paris time zone); changeable in the installer.
 
 ### IXIN Center (`ixin-center`)
-An in-house graphical application that opens on first login. 4 tabs:
+An in-house graphical application that opens on first login. 5 tabs:
 - **Accueil**: system information (kernel, CPU, GPU, RAM), Install button (in live mode), Update, links to getixin.com / ixin.online.
 - **Sécurité**: protection status (firewall, AppArmor, disk encryption, encrypted DNS, OpenSnitch, USBGuard) and one-click buttons to enable them; Tor Browser, KeePassXC, VeraCrypt, metadata cleaning, Lynis audit, antivirus scan, rootkit check.
 - **Jeux**: Steam, Heroic, Lutris, Bottles, ProtonUp-Qt, power profiles (performance / balanced), NVIDIA settings, and a Steam tip.
 - **Système**: full update, Discover / Flathub software store, Timeshift snapshots, partition manager, settings, system monitor, BleachBit, system log.
+- **Mises à jour**: IXIN Update status, security fixes with their CVEs, history, update mode, restore points.
 
 ### Gaming and Windows compatibility
 - **Steam** + **Proton** (runs most Windows games), **Heroic** (Epic, GOG, Amazon), **Lutris**, **Bottles**,
@@ -85,6 +103,13 @@ An in-house graphical application that opens on first login. 4 tabs:
   (e.g. Valorant, Fortnite, some Call of Duty titles, Rainbow Six Siege) **do not work**, on any Linux distribution.
   For those, keep Windows in dual boot. You can check a game on protondb.com.
 
+### Dual boot with Windows
+- The IXIN boot menu offers **IXIN OS**, **Windows** and **UEFI Firmware Settings** (screenshot `menu-demarrage-ixin-windows.png`).
+- Choosing **Windows** restarts the PC directly into Windows **through the PC's firmware**, the same way Windows starts
+  without IXIN. This is designed so that **BitLocker does not ask for its recovery key** (it often does when a Linux
+  boot loader starts Windows itself). If the firmware entry is missing, the menu starts Windows directly instead.
+- During installation, Windows partitions (NTFS, BitLocker) **can never be selected to be replaced or erased**.
+
 ### Security (defensive, enabled by default)
 - **UFW firewall**: incoming connections blocked, outgoing allowed.
 - **AppArmor** enabled (application confinement), **Firejail** available.
@@ -95,7 +120,6 @@ An in-house graphical application that opens on first login. 4 tabs:
 - No network service exposed (no SSH); sudo requires a password.
 - `ixin-secure` command: security status and enabling the optional protections
   (OpenSnitch application firewall, USBGuard blocking of unknown USB devices, Tor service, Lynis audit, ClamAV scan, rkhunter).
-- `ixin-update` command: system + Flatpak + firmware updates, plus a list of packages with known vulnerabilities (arch-audit).
 - **Honesty**: no system is "100% secure". IXIN OS applies reasonable defense in depth without breaking games.
   Performance tweaks that weaken security (e.g. `mitigations=off`) are deliberately left out.
 
@@ -107,7 +131,16 @@ An in-house graphical application that opens on first login. 4 tabs:
 - **Notifications** (taskbar icon): updates installed, restart needed, IXIN announcements.
 - **Push by the IXIN team**: the team can publish updates, **urgent fixes** (installed within the hour),
   block a faulty update, or send a message to all PCs — all **cryptographically signed** (no third party can impersonate IXIN).
-- "Mises à jour" tab in the IXIN Center (status, security fixes with their CVEs, history, mode, restore points).
+- Where updates come from (for a transparency / FAQ section):
+  - IXIN packages and the IXIN policy are published by GitHub Actions on **GitHub Pages**
+    (`https://hashcat-max.github.io/IXIN-GROUP/repo`) with a fallback copy on the `ixin-repo` branch of the repository;
+  - every package, the package database and the policy are **signed with the IXIN key**; PCs refuse anything unsigned.
+    Fingerprint to publish on the site: **`74DF FA0C 6B29 1E07 27EA  8A59 891C 90DD 6094 ABDF`**
+    ("IXIN OS Updates (équipe IXIN)");
+  - Arch Linux packages come from the official Arch mirrors, signed by Arch Linux.
+- Optional idea for the site: the signed policy file `…/repo/policy.json` is public JSON (`issued`, `expires`,
+  `urgent`, `notice`); a small "état des mises à jour" widget could show the date of the latest IXIN publication and
+  any current announcement.
 
 ### Privacy and tools
 Tor Browser, Tor + torsocks, Signal, KeePassXC, VeraCrypt, GnuPG + Kleopatra, mat2 / Metadata Cleaner,
@@ -117,48 +150,68 @@ BleachBit, WireGuard / OpenVPN (NetworkManager integration).
 Firefox, Thunderbird, LibreOffice, VLC, mpv, OBS Studio, GIMP, Dolphin, Kate, Okular, Gwenview,
 Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connect.
 
-## 5. Installation (graphical installer: Calamares)
+## 5. Installation
 
+Two ways, to present side by side on the site:
+- **From Windows, with IXIN OS Setup** — the simplest for Windows users: no USB stick, no ISO to reassemble. (§5.1)
+- **With a USB stick** — for a PC without Windows, a whole-disk install, a virtual machine, or a PC that IXIN OS Setup
+  does not support (BIOS / MBR). (§5.2)
+
+Requirements (both): 64-bit (x86_64) PC, **UEFI** recommended (legacy BIOS works for the live system),
+**4 GB RAM** minimum (8+ recommended), **40 GB** of disk minimum, **Secure Boot disabled** (see FAQ).
+
+### 5.1 From Windows, without a USB stick: IXIN OS Setup
+- **`IXIN-OS-Setup.exe`** (3.7 MB) is attached to every release. It runs on **Windows 10 / 11 (64-bit)** with a
+  **UEFI** boot and a **GPT** disk (nearly all PCs since 2012) and needs about **75 GB free on C:**
+  (45 GB minimum for IXIN OS — 80 GB recommended for games —, 6 GB for the installer, 5 GB of temporary download,
+  and 20 GB left free for Windows). A laptop should be plugged in (below 30 % battery the preparation is refused).
+- What the user does:
+  1. download and run `IXIN-OS-Setup.exe` (Windows asks for administrator rights: "Oui");
+  2. **check of the PC**: each point is explained (✔ ok, ⚠ good to know, ✖ blocking);
+  3. **choose the space** for IXIN OS (slider); IXIN OS is downloaded automatically (≈5 GB) and its SHA-256 is
+     verified — or an ISO already downloaded can be used;
+  4. if Windows is encrypted (**BitLocker** / device encryption): the **recovery key** is shown and can be saved to a
+     file; the user confirms having noted it;
+  5. confirmation, then **preparation**: Windows is shrunk, a 6 GB "IXIN-SETUP" partition receives the verified ISO,
+     an "IXIN OS Setup" entry is added to the boot menu (Windows stays the default);
+  6. **restart**: straight into the installer, or first into the UEFI settings if **Secure Boot** must be turned off;
+  7. in the IXIN OS live system, a welcome window explains the single choice to make: at the **"Partitions"** step,
+     "Remplacer une partition" is preselected → click the grey **"Espace libre"** zone → tick **"Chiffrer le système"**
+     (recommended). Erasing the disk or shrinking Windows again is refused in this mode;
+  8. finish the installation (name, password), restart: the IXIN menu offers IXIN OS and Windows.
+- On the first start of IXIN OS, the temporary "IXIN-SETUP" partition (6 GB) and the "IXIN OS Setup" menu are
+  removed automatically. Running IXIN OS Setup again in Windows then offers **"Rendre 6 Go à Windows"**.
+- **Everything can be undone** until IXIN OS is installed ("Annuler la préparation"); on any error during the
+  preparation, Windows is put back automatically in its original state.
+- Extra help built into the program: **"Débloquer la réduction"** (when Windows cannot be shrunk because of system
+  files: hibernation file, page file), **"Remettre le menu IXIN au démarrage"** (if a Windows update put Windows first
+  in the boot order); it recognises a PC where IXIN OS is already installed.
+- What it changes on the PC (all reversible before installation): Windows partition shrunk; exFAT "IXIN-SETUP"
+  partition without a drive letter; `\EFI\IXIN-SETUP\` boot loader (3 MB) in the Windows EFI partition; "IXIN OS
+  Setup" firmware boot entry; Windows Fast Startup turned off and hardware clock set to UTC (needed for dual boot);
+  BitLocker suspended for 3 restarts (Windows re-enables it by itself). Log: `C:\ProgramData\IXIN\setup.log`.
+- Not supported: BIOS (legacy) or MBR disk → use a USB stick; IXIN OS goes on the disk where Windows is.
+- The program is open source (`windows/` in the repository) but **not code-signed yet**: Windows SmartScreen
+  shows "Windows a protégé votre ordinateur" → "Informations complémentaires" → "Exécuter quand même".
+- Full user guide in French: **`docs/INSTALLATION-WINDOWS.md`** (requirements, step-by-step, Secure Boot,
+  BitLocker, undo, troubleshooting, what is modified). Good material for an "Installer depuis Windows" page.
+
+### 5.2 With a USB stick (graphical installer: Calamares)
 - Boot from a USB stick → **live** desktop (try it without installing) → "Installer IXIN OS" icon.
 - Steps: Welcome → Location → Keyboard → **Partitions** → User → Summary → Install → Finish.
-- Partitioning options: **"Install alongside Windows"** (automatic Windows shrinking, offered when Windows is detected),
-  **"Erase disk"**, or **manual partitioning**.
-- Layout: EFI partition (512 MB, or the existing Windows one) + separate **1 GB `/boot`** (ext4, holds the kernel)
-  + **Btrfs** system (subvolumes `@`, `@home`, `@cache`, `@log`, compatible with Timeshift snapshots), with optional
-  **LUKS2** encryption. Windows partitions (NTFS / BitLocker) can never be selected for replacement.
-- Boot menu (dual boot): **IXIN OS**, **Windows**, firmware settings. "Windows" restarts the PC straight into Windows
-  through the firmware, exactly as without IXIN, so BitLocker does not ask for its recovery key.
-- **GRUB** bootloader with **automatic Windows detection** (dual-boot menu).
-- Requirements: 64-bit (x86_64) PC with **UEFI** (legacy BIOS works for the live system), **4 GB RAM** minimum (8+ recommended), **40 GB** of disk.
+- Partitioning options: **"Effacer le disque"** (whole disk), **"Installer à côté"** (shrinks Windows, offered when
+  Windows is detected — not yet tested end to end with a real Windows), or **manual partitioning**.
+- Writing the ISO to a USB stick: **Ventoy** (recommended) or **Rufus** (Windows, mode GPT/UEFI), **balenaEtcher**.
+- Dual-boot tips with a USB stick: in Windows, turn off **Fast Startup** and **suspend BitLocker** first (IXIN OS Setup
+  does both automatically); disable **Secure Boot**; if the clock is off by an hour under Windows, run in an
+  administrator terminal on Windows:
+  `reg add "HKLM\System\CurrentControlSet\Control\TimeZoneInformation" /v RealTimeIsUniversal /d 1 /t REG_DWORD /f`
 
-### Install from Windows, without a USB stick: IXIN OS Setup
-- **IXIN-OS-Setup.exe** (published in each GitHub Release next to the ISO) runs on **Windows 10 / 11 (64-bit)**.
-  Requirements: **UEFI** boot with a **GPT** disk (nearly all PCs since 2012), about **75 GB free** on C:.
-- What it does, step by step (each step explained in the app, everything can be undone until IXIN OS is installed):
-  1. checks the PC (UEFI, disk, free space, BitLocker, Secure Boot, battery);
-  2. downloads the latest IXIN OS and verifies its **SHA-256** (or uses an ISO already downloaded);
-  3. if Windows is encrypted with **BitLocker**: shows the **recovery key** (to write down) and suspends
-     BitLocker for 3 reboots;
-  4. shrinks Windows by the chosen size, creates a 6 GB "IXIN-SETUP" partition holding the ISO, and adds an
-     "IXIN OS Setup" boot menu (Windows stays the default);
-  5. restarts directly into the IXIN OS installer (or into the UEFI settings first if **Secure Boot** must be turned off).
-- In the installer, "Replace a partition" is preselected: the user clicks the "Free space" area. Erasing the disk or
-  shrinking Windows again is refused in this mode. On first boot, IXIN OS removes the temporary partition and menu.
-- Limits: Secure Boot must be off (some Windows anti-cheat games require it), BIOS/MBR PCs must use a USB stick,
-  the program is not code-signed yet (Windows SmartScreen shows "More info → Run anyway").
-- Full user guide (French): `docs/INSTALLATION-WINDOWS.md` in the repository — good material for an
-  "Install from Windows" page on the site.
+### Disk layout (both ways)
+EFI partition (512 MB, or the existing Windows one) + separate **1 GB `/boot`** (ext4) + **Btrfs** system
+(subvolumes `@`, `@home`, `@cache`, `@log`, compatible with Timeshift snapshots), with optional **LUKS2** encryption.
 
-### Dual-boot guide with Windows using a USB stick (to put in the docs)
-1. In Windows: turn off **Fast Startup** and **suspend BitLocker** if the disk is encrypted.
-2. Write the ISO to a USB stick with **Rufus** (GPT / UEFI) or **Ventoy**.
-3. In the BIOS / UEFI: **disable Secure Boot** (IXIN OS does not yet provide a signed bootloader), then boot from the stick.
-4. Live desktop → "Installer IXIN OS" → **Install alongside** → drag the slider → check **Encrypt the system**.
-5. On reboot, the IXIN menu offers IXIN OS **and Windows**.
-6. Clock off by an hour under Windows: in an administrator terminal on Windows, run
-   `reg add "HKLM\System\CurrentControlSet\Control\TimeZoneInformation" /v RealTimeIsUniversal /d 1 /t REG_DWORD /f`
-
-### Live boot menu options
+### Live boot menu options (USB stick / ISO)
 - IXIN OS: Live / Installation
 - IXIN OS: Live loaded into RAM (faster, the USB stick can be removed)
 - IXIN OS: Graphics compatibility mode (nomodeset), if the screen stays black
@@ -177,67 +230,114 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
 ## 7. Compatibility (what is true today)
 
 - ✅ **64-bit Intel and AMD PCs** (desktops, laptops), UEFI and BIOS (live). AMD / Intel / NVIDIA GPUs.
+- ✅ **Install from Windows** (IXIN OS Setup): Windows 10 / 11 64-bit, UEFI + GPT disk, BitLocker supported.
 - ✅ **Virtual machines**: VirtualBox, VMware, QEMU / KVM, Hyper-V (guest tools included).
 - ⚠️ **Chromebooks**: only x86 (Intel / AMD) models with alternative UEFI firmware (MrChromebox). Not tested.
 - ❌ **Android phones / ARM tablets**: not supported (that would require a separate ARM port per device).
   The IXIN app on Android is the ecosystem's answer for phones.
 - ❌ **Mac with Apple Silicon (M1–M4)**: not supported. Intel Macs: possible, but not tested.
-- ❌ **Secure Boot**: must be disabled (signing planned for a later version).
-- ✅ **Install from Windows** (IXIN OS Setup): Windows 10 / 11 64-bit, UEFI + GPT disk.
+- ❌ **Secure Boot**: must be disabled (signing planned for a later version). Some Windows games with anti-cheat
+  (Valorant, Battlefield 6…) require Secure Boot **under Windows**: they will not start in Windows while it is off.
 
 ## 8. Downloads
 
-- The ISO (~4.8 GB, `ixin-os-YYYY.MM.DD-x86_64.iso`) is built automatically by **GitHub Actions**
-  (workflow "Construire l'ISO IXIN OS") and published in the repository's **GitHub Releases**,
-  **split into 1.9 GB parts** (GitHub limit of 2 GB per file), with a `.sha256` file.
-- Latest release page: `https://github.com/hashcat-max/IXIN-GROUP/releases/latest`
-- Reassemble the ISO:
+Current release: **`build-2026.10.15-3`** (October 15, 2026) — https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.15-3
+
+| File | Size | For |
+|---|---|---|
+| `IXIN-OS-Setup.exe` | 3.7 MB | Windows 10 / 11: install without a USB stick (downloads IXIN OS itself) |
+| `ixin-os-2026.10.15-x86_64.iso.part00` / `.part01` / `.part02` | 1.99 + 1.99 + 1.07 GB (**5.06 GB** in total) | USB stick, virtual machine |
+| `ixin-os-2026.10.15-x86_64.iso.sha256` | — | integrity check of the reassembled ISO |
+
+- ISO SHA-256: `6c14f81bd3420bf759ece72274d2a58d42c1a28b92f8a85b54ae9519222154f5`
+- `IXIN-OS-Setup.exe` SHA-256: `73f4d2f5eae8498342e349b80a37ccf340d99496590a0d98f3dd96ecc01b6466`
+- **Stable links** (always the latest release, good for buttons):
+  - `https://github.com/hashcat-max/IXIN-GROUP/releases/latest/download/IXIN-OS-Setup.exe`
+  - release page: `https://github.com/hashcat-max/IXIN-GROUP/releases/latest`
+  - the ISO part names contain the build date: link to the release page, or read the file list, sizes and dates
+    from the public API `https://api.github.com/repos/hashcat-max/IXIN-GROUP/releases/latest` (field `assets`).
+- The ISO is built automatically by **GitHub Actions** and published **split into 1.9 GB parts** (GitHub limit of
+  2 GB per file). Reassemble it:
   - Linux / macOS: `cat ixin-os-*.iso.part* > ixin-os.iso` then `sha256sum -c ixin-os-*.iso.sha256`
   - Windows (cmd): `copy /b ixin-os-….iso.part00+ixin-os-….iso.part01+ixin-os-….iso.part02 ixin-os.iso`
-- **Recommendation for the site**: a single direct download is far more convenient for the public than split parts.
-  Options: host the full ISO on object storage (Cloudflare R2, Backblaze B2, a CDN) and add a **torrent** link,
-  showing the size, version, date and SHA-256 hash on the download page.
-- Writing the ISO to a USB stick: **Ventoy** (recommended) or **Rufus** (Windows), **balenaEtcher** (Windows / Mac / Linux).
-- **IXIN-OS-Setup.exe** (about 4 MB) is attached to each release from now on: for Windows users it is the simplest
-  download (no reassembly, no USB stick). It always fetches the latest release itself.
+- **Recommendation for the site**: put IXIN OS Setup forward for Windows users (one small file, no reassembly). For the
+  ISO, a single direct download is more convenient than split parts: host the full ISO on object storage
+  (Cloudflare R2, Backblaze B2, a CDN) and add a **torrent** link, showing size, version, date and SHA-256.
 
 ## 9. Project status (to stay honest on the site)
 
-- Version: **first version (v0.1)**, rolling, dated builds.
-- Tested in a VM: ISO build ✅, UEFI boot ✅, live desktop + taskbar ✅, IXIN Center ✅,
-  graphical installer ✅, full encrypted install ✅, **reboot of the installed system ✅** (GRUB → IXIN unlock screen →
-  login → desktop; firewall, AppArmor, LUKS2 and encrypted DNS checked on the installed system).
-  Several bugs found during these tests have been fixed (missing `unsquashfs`, installer readability,
-  GRUB unable to read the kernel on encrypted Btrfs; fixed with a separate unencrypted `/boot` partition).
-- ⚠️ The **first published release (`build-2026.10.15-1`)** predates the GRUB fix: an install from it
-  may fail to boot. Use the **next** build (`build-2026.10.15-2` or later).
-- Not tested on real hardware yet (VM only): label it **"Beta"** on the site.
-- IXIN Update tested in a VM, including a full install from the ISO: restore point on first boot, automatic
-  updates, urgent IXIN pushes installed automatically (restore point, notification, IXIN announcement),
-  forged policy / replayed policy / tampered repo database all rejected, repair after a power cut mid-update.
-- ⚠️ Releases `build-2026.10.15-1` and `-2` predate IXIN Update. PCs installed from them enable it with
-  `tools/ixin-enable-updates.sh` (see docs/MISES-A-JOUR.md); the next ISO, built once the IXIN signing key
-  is configured on GitHub, includes it.
-- IXIN OS Setup (Windows): tested on every change on a real Windows 11 (GitHub Actions) with a virtual disk —
-  full preparation then full undo, firmware boot entries. The IXIN side was tested end to end in a VM on a simulated
-  Windows PC: firmware boot entry → "IXIN OS Setup" menu → live system started from the ISO stored on the disk →
-  guided install into the free space (Windows partitions cannot be selected), encrypted → first boot with automatic
-  cleanup → "IXIN / Windows" boot menu, Windows started by the firmware (no BitLocker recovery prompt), Windows files
-  intact. Not yet tested on a range of real PCs: call it **"Beta"** as well.
-- Ideas for later versions: Secure Boot signing, an optional "macOS-style" layout (dock), an optional security toolbox,
-  code signing for IXIN OS Setup, a dedicated package repository, translations.
+- Version: **Beta (v0.1)**, rolling, dated builds. Latest: **`build-2026.10.15-3`**, the first complete release
+  (IXIN Update + install from Windows). Older releases `-1` and `-2` are obsolete.
+- Tested in a VM: ISO build, UEFI boot, live desktop + taskbar, IXIN Center, graphical installer, full encrypted install,
+  reboot of the installed system (GRUB → IXIN unlock screen → login → desktop; firewall, AppArmor, LUKS2 and encrypted
+  DNS checked on the installed system).
+- IXIN Update tested in a VM on an installed system: restore point on first boot, automatic updates, urgent IXIN pushes
+  installed automatically (restore point, notification, IXIN announcement), forged policy / replayed policy / tampered
+  repository database all rejected, repair after a power cut mid-update.
+- IXIN OS Setup (Windows): tested automatically on every change on a real Windows 11 (GitHub Actions) with a virtual
+  disk — full preparation then full undo, firmware boot entries, "put the IXIN menu back first". The IXIN side was tested
+  end to end in a VM on a simulated Windows PC: firmware boot entry → "IXIN OS Setup" menu → live system started from the
+  ISO stored on the disk → guided install into the free space (Windows partitions cannot be selected), encrypted → first
+  start with automatic cleanup → "IXIN / Windows" menu, Windows started by the firmware, Windows files intact.
+- **Not tested on real hardware yet** (VM and Windows test machines only): label everything **"Bêta"** on the site.
+- Known limits: Secure Boot must be off; IXIN OS Setup is not code-signed (SmartScreen warning); BIOS / MBR PCs need a USB
+  stick; IXIN OS Setup installs on the Windows disk only; no automatic **uninstall** of IXIN OS yet; "Installer à côté"
+  from a USB stick not yet tested with a real Windows.
+- Ideas for later versions: Secure Boot signing, code signing for IXIN OS Setup, uninstall from Windows,
+  an optional "macOS-style" layout (dock), an optional security toolbox, translations.
 
 ## 10. Suggested structure for os.ixin.online
 
-1. **Home**: hero with the shield + "IXIN OS", tagline, big "Télécharger" button (version, size), desktop screenshot.
-2. **Features**: 5 sections. **Sécurité** (firewall, AppArmor, LUKS2, encrypted DNS, MAC), **Mises à jour automatiques**
-   (IXIN Update: security fixes as soon as they're published, restore points, IXIN push), **Jeux** (Steam / Proton, Heroic, Lutris…),
-   **Vie privée** (Tor, Signal, KeePassXC, VeraCrypt…), **Simplicité** (Windows-style desktop, IXIN Center, graphical installer).
-3. **Download**: link(s), SHA-256, requirements, how to write the USB stick, "Beta" notice.
-4. **Documentation**: installation, dual boot with Windows, first steps, IXIN commands, gaming (Proton, anti-cheat), security, FAQ, troubleshooting (black screen → compatibility mode, Secure Boot, BitLocker).
-5. **Compatibility**: supported / unsupported table (§7).
-6. **Ecosystem**: links to getixin.com and ixin.online (the IXIN app on Android / Windows / Mac).
-7. Footer: "Basé sur Arch Linux", notice that IXIN OS is not affiliated with the Arch Linux project, GitHub link.
+1. **Accueil**: hero with the shield + "IXIN OS", tagline, **two buttons**: "Installer depuis Windows"
+   (IXIN-OS-Setup.exe, stable link) and "Télécharger l'ISO"; version + "Bêta" badge; desktop screenshot.
+2. **Fonctionnalités**: **Sécurité** (firewall, AppArmor, LUKS2, encrypted DNS, MAC), **Mises à jour automatiques**
+   (IXIN Update: security fixes as soon as they're published, restore points, signed IXIN push), **Jeux**
+   (Steam / Proton, Heroic, Lutris…), **Vie privée** (Tor, Signal, KeePassXC, VeraCrypt…), **Simplicité**
+   (Windows-style desktop, IXIN Center, install from Windows, IXIN / Windows boot menu).
+3. **Télécharger**: the two ways (§5), files, sizes, SHA-256 (§8), requirements, "Bêta" notice.
+4. **Installer depuis Windows**: page adapted from `docs/INSTALLATION-WINDOWS.md` (steps, Secure Boot, BitLocker,
+   undo, troubleshooting).
+5. **Documentation**: USB installation, first steps, IXIN commands, gaming (Proton, anti-cheat), security, updates
+   (signed, fingerprint), troubleshooting (black screen → compatibility mode, Secure Boot, BitLocker), FAQ (§11).
+6. **Compatibilité**: supported / unsupported table (§7).
+7. **Écosystème**: links to getixin.com and ixin.online (the IXIN app on Android / Windows / Mac).
+8. Footer: "Basé sur Arch Linux", notice that IXIN OS is not affiliated with the Arch Linux project, GitHub link.
 
 **Site style**: the same design language as getixin.com (black background `#050505`, emerald / sapphire accents, Inter,
 shield logo, slow smooth animations). French as the primary language.
+
+## 11. Ready-to-use French copy (facts checked against the program)
+
+**Installer depuis Windows (bloc de la page d'accueil)**
+> **Installez IXIN OS depuis Windows, sans clé USB.** Téléchargez IXIN OS Setup, lancez-le : il vérifie votre PC,
+> télécharge IXIN OS, prépare la place sur le disque et redémarre sur l'installation. Windows et vos fichiers restent
+> en place, et tout peut être annulé tant qu'IXIN OS n'est pas installé. Au démarrage, un menu vous laisse choisir
+> entre IXIN OS et Windows.
+
+**FAQ**
+- **Windows affiche « Windows a protégé votre ordinateur ».** IXIN OS Setup n'est pas encore signé par un certificat
+  de signature de code. Cliquez sur « Informations complémentaires » puis « Exécuter quand même ». Son code source
+  est public.
+- **Faut-il désactiver Secure Boot ?** Oui, pour l'instant : IXIN OS ne démarre pas encore avec Secure Boot activé.
+  IXIN OS Setup redémarre directement dans les paramètres UEFI pour le faire. Attention : certains jeux Windows avec
+  anti-triche (Valorant, Battlefield 6…) exigent Secure Boot sous Windows.
+- **Mon Windows est chiffré (BitLocker).** IXIN OS Setup affiche votre clé de récupération avant de commencer :
+  notez-la ailleurs que sur le PC. Il suspend BitLocker pendant 3 démarrages ; Windows le réactive ensuite tout seul.
+  Dans le menu de démarrage, « Windows » démarre Windows comme d'habitude, par le firmware du PC.
+- **Mes fichiers Windows sont-ils touchés ?** Non : Windows est seulement réduit pour libérer de la place, avec les
+  outils de Windows lui-même. Une sauvegarde de vos fichiers importants reste conseillée avant toute modification
+  d'un disque.
+- **Combien de place faut-il ?** Environ 75 Go libres sur C: (45 Go minimum pour IXIN OS, 80 Go conseillés pour les
+  jeux).
+- **Peut-on annuler ?** Oui, tant qu'IXIN OS n'est pas installé : relancez IXIN OS Setup et choisissez « Annuler la
+  préparation ». En cas d'erreur pendant la préparation, Windows est remis dans son état d'origine automatiquement.
+- **Windows refuse d'être réduit.** Cliquez sur « Débloquer la réduction » dans IXIN OS Setup (fichiers système qui
+  ne peuvent pas être déplacés), puis suivez le guide si cela ne suffit pas.
+- **Après une mise à jour de Windows, le PC démarre directement sur Windows.** Relancez IXIN OS Setup et cliquez sur
+  « Remettre le menu IXIN au démarrage », ou choisissez IXIN dans le menu de démarrage du PC (F12, F9, F8, F11 ou
+  Échap selon la marque).
+- **Mon PC n'est pas compatible avec IXIN OS Setup (BIOS, disque MBR).** Utilisez l'ISO sur une clé USB (Ventoy ou
+  Rufus).
+- **Comment IXIN OS se met-il à jour ?** Tout seul, comme Windows : les correctifs de sécurité dès leur publication,
+  le reste une fois par jour, avec un point de restauration avant chaque mise à jour. Les mises à jour IXIN sont signées
+  par la clé de l'équipe IXIN (empreinte publiée sur ce site).
