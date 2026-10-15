@@ -4,6 +4,14 @@ name: Publier les mises à jour IXIN
 # Tous les PC IXIN OS le consultent automatiquement : une modification fusionnée dans
 # packages/ ou repo/policy.json arrive chez les utilisateurs en quelques heures
 # (dans l'heure si la politique est marquée « urgent »).
+#
+# Hébergement : les versions publiées (« releases ») de ce dépôt GitHub sont immuables, on ne
+# peut pas y remplacer des fichiers ; le dépôt [ixin], qui change à chaque publication, est donc
+# servi par :
+#   - GitHub Pages (principal)   https://hashcat-max.github.io/IXIN-GROUP/repo
+#   - la branche ixin-repo        https://raw.githubusercontent.com/hashcat-max/IXIN-GROUP/ixin-repo/repo
+#     (secours ; un seul commit, remplacé à chaque publication)
+# Les PC essaient ces adresses dans cet ordre (ixin-mirrorlist, policy_url d'IXIN Update).
 
 on:
   push:
@@ -11,13 +19,16 @@ on:
       - "packages/**"
       - "repo/policy.json"
       - "tools/build-packages.sh"
+      - ".github/workflows/publish-repo.yml"
   workflow_dispatch:
   schedule:
     # Chaque lundi : nouvelle signature de la politique (valable 14 jours)
     - cron: "17 4 * * 1"
 
 permissions:
-  contents: write
+  contents: write   # branche ixin-repo
+  pages: write      # GitHub Pages
+  id-token: write   # déploiement GitHub Pages
 
 concurrency:
   group: publish-repo
@@ -29,6 +40,8 @@ jobs:
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      pages: ${{ steps.pages.outputs.mode }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,15 +59,12 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Récupérer les paquets déjà publiés (versions inchangées réutilisées telles quelles)
+      - name: Récupérer le dépôt déjà publié (versions inchangées réutilisées telles quelles)
         if: steps.key.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p prev
-          if gh release view repo --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release download repo --repo "$GITHUB_REPOSITORY" --dir prev \
-              --pattern '*.pkg.tar.zst' --pattern '*.pkg.tar.zst.sig' || true
+          if git fetch -q --depth=1 origin ixin-repo 2>/dev/null; then
+            git archive FETCH_HEAD repo | tar -x -C prev --strip-components=1 || true
           fi
           ls -1 prev
 
@@ -74,30 +84,62 @@ jobs:
           sudo chown -R "$USER" out-repo prev
           ls -l out-repo
 
-      - name: Publier sur la release « repo »
+      - name: Préparer le site du dépôt
+        id: site
+        if: steps.key.outputs.skip != 'true'
+        run: tools/prepare-repo-site.sh out-repo prev "$RUNNER_TEMP/site"
+
+      - name: Publier sur la branche ixin-repo
         if: steps.key.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cd out-repo
-          if ! gh release view repo --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create repo --repo "$GITHUB_REPOSITORY" --prerelease \
-              --title "Dépôt de mises à jour IXIN OS (usage automatique)" \
-              --notes "Dépôt pacman [ixin] signé, consulté automatiquement par IXIN Update sur chaque PC IXIN OS. Pour installer IXIN OS, téléchargez l'ISO dans les autres versions."
-          fi
-          # 1) les paquets d'abord, 2) puis la base et la politique : un PC ne voit jamais
-          #    une base qui référence un paquet pas encore en ligne.
-          gh release upload repo --repo "$GITHUB_REPOSITORY" --clobber ./*.pkg.tar.zst ./*.pkg.tar.zst.sig
-          gh release upload repo --repo "$GITHUB_REPOSITORY" --clobber \
-            ./ixin.db ./ixin.db.sig ./ixin.db.tar.gz ./ixin.db.tar.gz.sig \
-            ./ixin.files ./ixin.files.sig ./ixin.files.tar.gz ./ixin.files.tar.gz.sig \
-            ./policy.json ./policy.json.sig
-          # 3) suppression des anciennes versions qui ne sont plus référencées
-          keep="$(ls -1)"
-          gh release view repo --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
-            while read -r asset; do
-              grep -qxF "$asset" <<<"$keep" || gh release delete-asset repo "$asset" --repo "$GITHUB_REPOSITORY" --yes
-            done
-          echo "### Dépôt [ixin] publié" >> "$GITHUB_STEP_SUMMARY"
-          ls -1 *.pkg.tar.zst | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY"
-          python3 -c "import json;p=json.load(open('policy.json'));print(f\"- politique : serial {p['serial']}, urgent={p['urgent']}, hold={p['hold']}\")" >> "$GITHUB_STEP_SUMMARY"
+          # Dépôt git séparé (hors du site : GitHub Pages ne doit pas recevoir de dossier .git)
+          export GIT_DIR="$RUNNER_TEMP/ixin-repo.git" GIT_WORK_TREE="$RUNNER_TEMP/site"
+          git init -q -b ixin-repo
+          git add -A
+          serial="$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/site/repo/policy.json'))['serial'])")"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Dépôt [ixin] — politique ${serial} (${GITHUB_SHA::7})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/ixin-repo
+
+      - name: GitHub Pages activé ?
+        id: pages
+        if: steps.key.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mode="$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type 2>/dev/null || true)"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Dépôt [ixin] publié"
+            ls -1 out-repo/*.pkg.tar.zst | xargs -n1 basename | sed 's/^/- /'
+            python3 -c "import json;p=json.load(open('out-repo/policy.json'));print(f\"- politique : serial {p['serial']}, urgent={p['urgent']}, hold={p['hold']}\")"
+            echo "- branche de secours : https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/ixin-repo/repo"
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "$mode" in
+            workflow) echo "- GitHub Pages : déploiement en cours (job « pages »)" >> "$GITHUB_STEP_SUMMARY" ;;
+            legacy)   echo "- GitHub Pages : publié depuis une branche (doit être ixin-repo, dossier racine)" >> "$GITHUB_STEP_SUMMARY" ;;
+            *)
+              msg="GitHub Pages n'est pas activé : les PC utilisent l'adresse de secours (raw.githubusercontent.com), limitée par GitHub. À activer une fois : Settings → Pages → Source : « GitHub Actions » (docs/MISES-A-JOUR.md)."
+              echo "::warning::$msg"
+              echo "- ⚠️ $msg" >> "$GITHUB_STEP_SUMMARY" ;;
+          esac
+
+      - name: Préparer le déploiement GitHub Pages
+        if: steps.pages.outputs.mode == 'workflow'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+
+  pages:
+    needs: publish
+    if: needs.publish.outputs.pages == 'workflow'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Déployer sur GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

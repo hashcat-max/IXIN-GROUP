@@ -63,9 +63,12 @@ Tout ce qu'IXIN installe est dans des **paquets pacman** du dossier `packages/` 
 ### Publier une mise à jour normale
 1. Modifier les fichiers dans `packages/<paquet>/rootfs/…` (chemins identiques à ceux du système).
 2. Commit + push sur la branche principale.
-3. L'action **« Publier les mises à jour IXIN »** construit, signe et publie le dépôt `[ixin]`
-   (release GitHub `repo`). La version d'un paquet = date du dernier commit qui l'a modifié :
-   seuls les paquets modifiés sont retéléchargés par les PC.
+3. L'action **« Publier les mises à jour IXIN »** construit, signe et publie le dépôt `[ixin]` sur
+   **GitHub Pages** (`https://hashcat-max.github.io/IXIN-GROUP/repo`) et sur la branche **`ixin-repo`**
+   (adresse de secours, `raw.githubusercontent.com`). La version d'un paquet = date du dernier commit
+   qui l'a modifié : seuls les paquets modifiés sont retéléchargés par les PC.
+   (Les versions — « releases » — du dépôt GitHub sont immuables : on ne peut pas y remplacer des
+   fichiers, elles servent donc uniquement aux ISO.)
 4. Les PC l'installent dans les **24 h** (mode automatique) ou préviennent l'utilisateur (mode « prévenir »).
 
 ### Correctif urgent (faille grave)
@@ -107,7 +110,10 @@ Sans cette clé, **aucune** mise à jour IXIN n'est acceptée par les PC (c'est 
    nom **`IXIN_SIGNING_KEY`**, valeur = contenu complet de `ixin-signing-key-PRIVEE.asc`.
    (Si la clé a une phrase de passe : second secret `IXIN_SIGNING_KEY_PASSPHRASE`.)
 3. Ranger la clé privée et le certificat de révocation **hors ligne**, puis les supprimer de l'ordinateur.
-4. Lancer l'action **« Publier les mises à jour IXIN »** puis **« Construire l'ISO IXIN OS »** :
+4. Activer **GitHub Pages** (hébergement principal des mises à jour) : *Settings → Pages →
+   Build and deployment → Source : **GitHub Actions***. Sans cela, les PC utilisent l'adresse de
+   secours (branche `ixin-repo`), que GitHub limite davantage.
+5. Lancer l'action **« Publier les mises à jour IXIN »** puis **« Construire l'ISO IXIN OS »** :
    la clé publique est intégrée automatiquement à l'ISO (`ixin-keyring`).
 
 **Changer de clé** :

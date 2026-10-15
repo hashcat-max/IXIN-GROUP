@@ -14,7 +14,8 @@
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-REPO_URL="${IXIN_REPO_URL:-https://github.com/hashcat-max/IXIN-GROUP/releases/download/repo}"
+# Serveurs du dépôt [ixin], essayés dans l'ordre (GitHub Pages, puis la branche ixin-repo)
+REPO_URLS="${IXIN_REPO_URL:-https://hashcat-max.github.io/IXIN-GROUP/repo https://raw.githubusercontent.com/hashcat-max/IXIN-GROUP/ixin-repo/repo}"
 G='\e[38;2;25;243;164m'; R='\e[31m'; N='\e[0m'
 msg(){ printf "${G}==>${N} %s\n" "$*"; }
 die(){ printf "${R}==> ERREUR :${N} %s\n" "$*" >&2; exit 1; }
@@ -26,9 +27,10 @@ command -v pacman >/dev/null || die "pacman introuvable : ce n'est pas IXIN OS"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-msg "Dépôt [ixin] : $REPO_URL"
 if [[ ! -f /etc/pacman.d/ixin-mirrorlist ]]; then
-  printf '# IXIN OS — serveurs du dépôt de mises à jour [ixin]\nServer = %s\n' "$REPO_URL" > /etc/pacman.d/ixin-mirrorlist
+  { echo "# IXIN OS — serveurs du dépôt de mises à jour [ixin]"
+    for u in $REPO_URLS; do echo "Server = $u"; done
+  } > /etc/pacman.d/ixin-mirrorlist
 fi
 if ! grep -q '^\[ixin\]' /etc/pacman.conf; then
   cp /etc/pacman.conf /etc/pacman.conf.avant-ixin-update
@@ -37,7 +39,12 @@ if ! grep -q '^\[ixin\]' /etc/pacman.conf; then
 fi
 
 msg "Clé de signature de l'équipe IXIN"
-curl -fsSL --retry 3 -o "$TMP/ixin.db" "$REPO_URL/ixin.db" || die "dépôt [ixin] injoignable"
+REPO_URL=""
+for u in $REPO_URLS; do
+  if curl -fsSL --retry 2 -o "$TMP/ixin.db" "$u/ixin.db"; then REPO_URL="$u"; break; fi
+done
+[[ -n "$REPO_URL" ]] || die "dépôt [ixin] injoignable"
+msg "Dépôt [ixin] : $REPO_URL"
 desc="$(bsdtar -tf "$TMP/ixin.db" | grep -m1 '^ixin-keyring-.*/desc$')" || die "ixin-keyring absent du dépôt"
 keyring_file="$(bsdtar -xOf "$TMP/ixin.db" "$desc" | sed -n '/^%FILENAME%$/{n;p;q}')"
 [[ "$keyring_file" =~ ^ixin-keyring-[^/]+\.pkg\.tar\.zst$ ]] || die "nom de paquet ixin-keyring invalide"

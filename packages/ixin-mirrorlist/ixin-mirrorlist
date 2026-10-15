@@ -1,5 +1,8 @@
 # IXIN OS — serveurs du dépôt de mises à jour [ixin] (paquets signés par l'équipe IXIN)
 # Ce fichier est mis à jour automatiquement : l'équipe IXIN peut ajouter des miroirs.
-Server = https://github.com/hashcat-max/IXIN-GROUP/releases/download/repo
+# Les serveurs sont essayés dans l'ordre.
+Server = https://hashcat-max.github.io/IXIN-GROUP/repo
+# Secours : branche ixin-repo du dépôt GitHub
+Server = https://raw.githubusercontent.com/hashcat-max/IXIN-GROUP/ixin-repo/repo
 # Miroir sur le domaine IXIN (à activer quand il sera en place) :
 #Server = https://os.ixin.online/repo

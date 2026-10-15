@@ -74,7 +74,7 @@ DEFAULTS = {
     "respect_metered": "yes",
     "arch_news_check": "yes",
     "arch_news_grace_days": "3",
-    "policy_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/repo/policy.json",
+    "policy_url": "https://hashcat-max.github.io/IXIN-GROUP/repo/policy.json https://raw.githubusercontent.com/hashcat-max/IXIN-GROUP/ixin-repo/repo/policy.json",
 }
 MODES = ("auto", "notify", "manual")
 MODE_LABELS = {
@@ -365,34 +365,40 @@ def policy_valid(p, st):
 
 
 def refresh_policy(cfg, st):
-    """Télécharge et vérifie la politique IXIN. Retourne la politique valide (ou None)."""
-    url = cfg.get("policy_url", "").strip()
+    """Télécharge et vérifie la politique IXIN. Retourne la politique valide (ou None).
+
+    policy_url peut contenir plusieurs adresses (miroirs) : la première qui fournit une
+    politique correctement signée et valide est retenue.
+    """
     policy = None
-    if url:
-        RUN_DIR.mkdir(parents=True, exist_ok=True)
-        data, sig = RUN_DIR / "policy.json", RUN_DIR / "policy.json.sig"
+    data, sig = RUN_DIR / "policy.json", RUN_DIR / "policy.json.sig"
+    for url in cfg.get("policy_url", "").split():
         try:
+            RUN_DIR.mkdir(parents=True, exist_ok=True)
             http_get(url, data)
             http_get(url + ".sig", sig)
-            if verify_signature(data, sig):
-                candidate = json.loads(data.read_text(encoding="utf-8"))
-                if policy_valid(candidate, st):
-                    policy = candidate
-                    st["policy_serial"] = int(candidate.get("serial", 0))
-                    shutil.copy(data, POLICY_CACHE)
-                    shutil.copy(sig, str(POLICY_CACHE) + ".sig")
-                else:
-                    log("Politique IXIN ignorée : expirée ou plus ancienne que la précédente")
-            else:
-                log("Politique IXIN ignorée : signature absente ou invalide")
+            if not verify_signature(data, sig):
+                log(f"Politique IXIN ignorée ({url}) : signature absente ou invalide")
+                continue
+            candidate = json.loads(data.read_text(encoding="utf-8"))
         except (OSError, ValueError) as e:
-            log(f"Politique IXIN indisponible ({e.__class__.__name__}) — utilisation de la copie locale")
+            log(f"Politique IXIN indisponible sur {url} ({e.__class__.__name__})")
+            continue
+        if not policy_valid(candidate, st):
+            log(f"Politique IXIN ignorée ({url}) : expirée ou plus ancienne que la précédente")
+            continue
+        policy = candidate
+        st["policy_serial"] = int(candidate.get("serial", 0))
+        shutil.copy(data, POLICY_CACHE)
+        shutil.copy(sig, str(POLICY_CACHE) + ".sig")
+        break
     if policy is None and POLICY_CACHE.exists():
         cached_sig = Path(str(POLICY_CACHE) + ".sig")
         if cached_sig.exists() and verify_signature(POLICY_CACHE, cached_sig):
             candidate = read_json(POLICY_CACHE, None)
             if candidate and policy_valid(candidate, st):
                 policy = candidate
+                log("Politique IXIN : utilisation de la copie locale")
     return policy
 
 
