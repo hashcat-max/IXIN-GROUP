@@ -48,6 +48,9 @@ In `docs/screenshots/`:
 - `bureau.png`: desktop with the Windows 11-style taskbar
 - `centre-ixin.png`: the IXIN Center application (welcome screen)
 - `menu-demarrage-live.png`: boot menu of the USB stick / ISO
+- `deverrouillage-chiffrement.png`: IXIN boot screen asking for the encrypted disk password
+- `ecran-connexion.png`: login screen of the installed system
+- `ixin-secure.png`: security status in the terminal (installed system)
 - `grub-installe.png`: IXIN boot screen of the installed system
 - `installeur-emplacement.png`, `installeur-partitions-chiffrement.png`, `installeur-utilisateur.png`, `installeur-diaporama.png`: graphical installer
 
@@ -168,11 +171,12 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
 
 - Version: **first version (v0.1)**, rolling, dated builds.
 - Tested in a VM: ISO build ✅, UEFI boot ✅, live desktop + taskbar ✅, IXIN Center ✅,
-  graphical installer ✅, full encrypted install ✅.
+  graphical installer ✅, full encrypted install ✅, **reboot of the installed system ✅** (GRUB → IXIN unlock screen →
+  login → desktop; firewall, AppArmor, LUKS2 and encrypted DNS checked on the installed system).
   Several bugs found during these tests have been fixed (missing `unsquashfs`, installer readability,
   GRUB unable to read the kernel on encrypted Btrfs; the latter was fixed by moving `/boot` to the EFI partition).
-- ⚠️ The **first published release (`build-2026.10.15-1`)** predates the GRUB fix: encrypted installs from it
-  may fail to boot. Use the **next** build.
+- ⚠️ The **first published release (`build-2026.10.15-1`)** predates the GRUB fix: an install from it
+  may fail to boot. Use the **next** build (`build-2026.10.15-2` or later).
 - Not tested on real hardware yet (VM only): label it **"Beta"** on the site.
 - Ideas for later versions: Secure Boot signing, an optional "macOS-style" layout (dock), an optional security toolbox,
   a Windows helper that prepares the USB stick, a dedicated package repository, translations.
