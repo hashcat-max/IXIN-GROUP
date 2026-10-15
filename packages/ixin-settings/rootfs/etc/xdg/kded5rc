@@ -1,0 +1,5 @@
+# IXIN OS : l'accueil de KDE (Plasma Welcome) est remplacé par le Centre IXIN.
+# Depuis Plasma 6.7, il est lancé par ce module KDED (et non plus par un fichier autostart).
+# Le nom kded5rc est celui que lit encore kded6.
+[Module-kded_plasma_welcome]
+autoload=false
