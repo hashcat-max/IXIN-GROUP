@@ -479,12 +479,22 @@ class Center(QMainWindow):
         return w
 
 
+def from_windows():
+    """Système live démarré par IXIN OS Setup (installation lancée depuis Windows)."""
+    try:
+        return "ixin.setup=windows" in Path("/proc/cmdline").read_text().split()
+    except OSError:
+        return False
+
+
 def main():
     # Une erreur inattendue est affichée dans le journal au lieu de fermer le Centre IXIN.
     sys.excepthook = lambda t, e, tb: sys.stderr.write("".join(traceback.format_exception(t, e, tb)))
     welcome = "--welcome" in sys.argv
     if welcome and NO_WELCOME.exists():
         return 0
+    if welcome and IS_LIVE and from_windows():
+        return 0   # live lancé par IXIN OS Setup : son propre accueil (ixin-setup-windows) s'affiche seul
     tab = "home"
     if "--tab" in sys.argv[:-1]:
         tab = sys.argv[sys.argv.index("--tab") + 1]

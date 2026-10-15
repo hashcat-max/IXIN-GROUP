@@ -48,6 +48,7 @@ QWidget { background: #0b0c10; color: #e9ecef; font-family: Inter; font-size: 10
 QLabel#title { font-size: 17pt; font-weight: 600; color: #ffffff; }
 QLabel#accent { color: #19f3a4; font-weight: 600; }
 QFrame#card { background: #111318; border: 1px solid #1f232b; border-radius: 12px; }
+QFrame#card QLabel { background: transparent; }
 QPushButton { background: #151820; border: 1px solid #23272f; border-radius: 8px; padding: 10px 18px; }
 QPushButton:hover { border-color: #19f3a4; }
 QPushButton#primary { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #19f3a4, stop:1 #1c6bff);
@@ -126,6 +127,9 @@ def main():
     buttons.addWidget(start)
     lay.addLayout(buttons)
 
+    dlg.show()
+    dlg.raise_()
+    dlg.activateWindow()
     if dlg.exec() == QDialog.DialogCode.Accepted:
         subprocess.Popen(["/usr/local/bin/ixin-install"], start_new_session=True)
     return 0
