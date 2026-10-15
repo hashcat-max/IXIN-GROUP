@@ -19,7 +19,7 @@ aux jeux Steam / Windows**.
 | **Sécurité** | Pare-feu UFW (entrant bloqué), AppArmor, sysctl durcis, DNS chiffré (DNS-over-TLS Quad9), MAC Wi-Fi aléatoire, nom d'hôte non envoyé en DHCP, chiffrement de disque LUKS à l'installation, Firejail, OpenSnitch, USBGuard, ClamAV, rkhunter, Lynis, arch-audit. Commande `ixin-secure`. |
 | **Vie privée** | Navigateur Tor, Tor + torsocks, Signal, KeePassXC, VeraCrypt, GnuPG/Kleopatra, mat2 / Metadata Cleaner, BleachBit, WireGuard / OpenVPN. |
 | **Applications** | Firefox, Thunderbird, LibreOffice, VLC, mpv, OBS Studio, GIMP, Dolphin, Kate, Okular, Gwenview, Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs). |
-| **Installation** | Calamares : « À côté de Windows » (redimensionnement automatique), Btrfs avec sous-volumes `@ @home @cache @log`, chiffrement LUKS, GRUB avec détection de Windows (os-prober). |
+| **Installation** | Calamares : « À côté de Windows » (redimensionnement automatique), Btrfs avec sous-volumes `@ @home @cache @log`, chiffrement **LUKS2 (argon2id)** déverrouillé au démarrage sur l'écran IXIN, partition de démarrage EFI de 1 Go, GRUB avec détection de Windows (os-prober). |
 
 ## Obtenir l'ISO
 

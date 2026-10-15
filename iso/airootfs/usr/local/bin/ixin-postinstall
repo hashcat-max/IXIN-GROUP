@@ -8,15 +8,14 @@ prepare() {
     for dir in /usr/lib/modules/*/; do
         [[ -f "$dir/pkgbase" && -f "$dir/vmlinuz" ]] || continue
         pkgbase=$(<"$dir/pkgbase")
-        install -Dm644 "$dir/vmlinuz" "/boot/vmlinuz-$pkgbase"
+        # /boot est la partition EFI (FAT32) : cp sans chmod
+        cp -f "$dir/vmlinuz" "/boot/vmlinuz-$pkgbase"
         log "  vmlinuz-$pkgbase"
         cat > "/etc/mkinitcpio.d/$pkgbase.preset" <<PRESET
 # mkinitcpio preset — '$pkgbase'
 ALL_kver="/boot/vmlinuz-$pkgbase"
-PRESETS=('default' 'fallback')
+PRESETS=('default')
 default_image="/boot/initramfs-$pkgbase.img"
-fallback_image="/boot/initramfs-$pkgbase-fallback.img"
-fallback_options="-S autodetect"
 PRESET
     done
 
@@ -67,6 +66,11 @@ finalize() {
     fi
     grep '^HOOKS=' "$conf"
     plymouth-set-default-theme ixin || true
+
+    log "Thème GRUB copié sur /boot (lisible par GRUB, le reste du disque étant chiffré)"
+    mkdir -p /boot/grub/themes
+    rm -rf /boot/grub/themes/ixin
+    cp -r /usr/share/grub/themes/ixin /boot/grub/themes/ixin
 }
 
 case "${1:-}" in
