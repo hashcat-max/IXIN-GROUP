@@ -39,7 +39,7 @@ namespace IxinSetup
 
         public static Button Button(string text, bool primary = false)
         {
-            var b = new Button
+            var b = new FlatButton
             {
                 Text = text,
                 Font = primary ? Bold : Body,
@@ -90,6 +90,27 @@ namespace IxinSetup
                 case CheckLevel.Warning: return Warning;
                 default: return Danger;
             }
+        }
+    }
+
+    /// <summary>
+    /// Bouton plat qui s'estompe vraiment une fois désactivé : WinForms se contente d'assombrir
+    /// le texte, si bien qu'un « Continuer » vert désactivé ressemblait à un bouton actif.
+    /// </summary>
+    internal sealed class FlatButton : Button
+    {
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (Enabled)
+            {
+                base.OnPaint(e);
+                return;
+            }
+            var g = e.Graphics;
+            g.Clear(Theme.Card);
+            using (var pen = new Pen(Theme.Border)) g.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, Color.FromArgb(98, 104, 112), Theme.Card,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
         }
     }
 }
