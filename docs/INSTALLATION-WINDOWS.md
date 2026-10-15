@@ -32,11 +32,20 @@ IXIN OS Setup vérifie tout cela lui-même et explique ce qui bloque.
    complémentaires → Exécuter quand même** (le programme n'est pas encore signé par un
    certificat de signature de code ; son code source est public, dossier `windows/`).
 2. **Vérification du PC** : chaque point est expliqué (✔ bon, ⚠ à savoir, ✖ bloquant).
+
+   <img src="screenshots/ixin-os-setup-2-verification.png" alt="IXIN OS Setup : vérification du PC" width="480">
+
 3. **Espace pour IXIN OS** : choisissez la taille (curseur). Le programme d'installation est
    téléchargé automatiquement (environ 5 Go), ou vous pouvez choisir une ISO déjà téléchargée
    (le fichier `.sha256` publié avec elle doit être dans le même dossier).
+
+   <img src="screenshots/ixin-os-setup-3-espace.png" alt="IXIN OS Setup : espace pour IXIN OS" width="480">
+
 4. **BitLocker** (si Windows est chiffré) : votre **clé de récupération** de 48 chiffres est
    affichée ; notez-la ou enregistrez-la **ailleurs que sur ce PC** (clé USB, téléphone, papier).
+
+   <img src="screenshots/ixin-os-setup-4-cle-bitlocker.png" alt="IXIN OS Setup : clé de récupération BitLocker (exemple)" width="480">
+
 5. **Confirmation**, puis **préparation** : téléchargement et vérification de l'ISO, réduction
    de Windows, création de la partition « IXIN-SETUP », menu de démarrage. Si Windows propose
    de « formater » un nouveau disque pendant cette étape, cliquez sur **Annuler**.
@@ -45,6 +54,9 @@ IXIN OS Setup vérifie tout cela lui-même et explique ce qui bloque.
    - **Secure Boot activé** : voir la section 3, puis le PC démarre sur l'installation.
 7. Dans le menu **IXIN OS Setup**, choisissez **« Installer IXIN OS (à côté de Windows) »**.
    Le bureau d'IXIN OS s'ouvre avec une fenêtre d'accueil : cliquez sur **« Lancer l'installation »**.
+
+   <img src="screenshots/depuis-windows-guide.png" alt="Fenêtre d'accueil d'IXIN OS après IXIN OS Setup" width="640">
+
 8. Dans l'installation, à l'étape **« Partitions »** :
    - **« Remplacer une partition »** est déjà sélectionné ;
    - cliquez sur la zone grise **« Espace libre »** dans la barre du disque ;
@@ -52,10 +64,17 @@ IXIN OS Setup vérifie tout cela lui-même et explique ce qui bloque.
 
    Pour protéger Windows, effacer le disque ou réduire de nouveau Windows est refusé dans ce mode,
    et une partition Windows ne peut jamais être choisie pour être remplacée.
+   *Version build-2026.10.15-3 : une option « Installer à côté » y apparaît encore ; ne la choisissez
+   pas (elle disparaît dans la version suivante).*
+
+   <img src="screenshots/depuis-windows-partitions.png" alt="Étape Partitions : Espace libre sélectionné, système chiffré" width="640">
+
 9. Terminez l'installation (nom, mot de passe), puis redémarrez. Au démarrage, le menu IXIN propose
    **IXIN OS**, **Windows** et les paramètres du firmware (UEFI). Choisir **Windows** redémarre
    aussitôt le PC directement sur Windows, par son entrée du firmware, exactement comme si IXIN
    n'était pas là : BitLocker ne demande pas sa clé de récupération.
+
+   <img src="screenshots/menu-demarrage-ixin-windows.png" alt="Menu de démarrage IXIN : IXIN OS ou Windows" width="640">
 
 Au premier démarrage d'IXIN OS, la partition « IXIN-SETUP » (6 Go) et le menu « IXIN OS Setup »
 sont supprimés automatiquement. Pour rendre ces 6 Go à Windows : relancez IXIN OS Setup sous
