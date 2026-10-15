@@ -502,8 +502,15 @@ def pending_updates(conf, holds):
     return updates
 
 
+_advisories_cache = None
+
+
 def security_advisories():
-    """Paquets installés vulnérables dont le correctif est disponible (arch-audit)."""
+    """Paquets installés vulnérables dont le correctif est disponible (arch-audit).
+    Résultat gardé 10 minutes : la recherche puis l'installation s'en servent toutes les deux."""
+    global _advisories_cache
+    if _advisories_cache and now() - _advisories_cache[0] < 600:
+        return _advisories_cache[1]
     r = run(["arch-audit", "-u", "-b", str(TEMP_DB), "--json"], timeout=180)
     if r.returncode != 0:
         return None
@@ -517,7 +524,21 @@ def security_advisories():
             entry = result.setdefault(pkg, {"severity": avg.get("severity", ""), "cves": [], "avg": []})
             entry["cves"].extend(avg.get("issues", []))
             entry["avg"].append(avg.get("name"))
+    _advisories_cache = (now(), result)
     return result
+
+
+def mark_security(updates, policy, st):
+    """Signale les correctifs de sécurité : avis de sécurité Arch (CVE) et paquets IXIN publiés
+    en urgence. Retourne les avis (None si arch-audit est indisponible)."""
+    advisories = security_advisories()
+    for u in updates:
+        adv = (advisories or {}).get(u["name"])
+        if adv:
+            u.update(security=True, severity=adv["severity"], cves=sorted(set(adv["cves"]))[:20])
+        elif policy_urgent(policy, st) and u["name"].startswith("ixin-"):
+            u.update(security=True, severity="IXIN")
+    return advisories
 
 
 def installed_versions():
@@ -615,13 +636,7 @@ def do_check(cfg, policy, st, download):
                     error=err)
         return None
     updates = pending_updates(conf, holds)
-    advisories = security_advisories()
-    for u in updates:
-        adv = (advisories or {}).get(u["name"])
-        if adv:
-            u.update(security=True, severity=adv["severity"], cves=sorted(set(adv["cves"]))[:20])
-        elif policy_urgent(policy, st) and u["name"].startswith("ixin-"):
-            u.update(security=True, severity="IXIN")
+    advisories = mark_security(updates, policy, st)
     security = sum(1 for u in updates if u["security"])
     st["pending_security"] = security > 0
     downloaded = False
@@ -697,6 +712,7 @@ def do_apply(cfg, policy, st, reason, verbose=False):
         save_status(state="error", message="Impossible de joindre les serveurs de mise à jour", error=err)
         return False
     updates = pending_updates(conf, holds)
+    mark_security(updates, policy, st)      # pour l'historique et la notification « dont N de sécurité »
     flatpak = cfg.getboolean("flatpak") and shutil.which("flatpak")
     if not updates and not flatpak:
         save_status(state="idle", message="Votre système est à jour", updates=[], total_updates=0, security_updates=0)
@@ -911,7 +927,7 @@ def cmd_auto(args):
                             postponed=", ".join(reasons))
                 log(f"Mise à jour de sécurité reportée : {', '.join(reasons)}")
                 return 0
-            ok = do_apply(cfg, policy, st, reason="sécurité" if security else "urgente (IXIN)")
+            ok = do_apply(cfg, policy, st, reason="urgente (IXIN)" if urgent else "sécurité")
             if ok and urgent:
                 st["urgent_done_serial"] = int(policy.get("serial", 0))
             save_state(st)

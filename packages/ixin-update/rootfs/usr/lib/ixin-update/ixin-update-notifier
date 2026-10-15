@@ -18,6 +18,7 @@ from PyQt6.QtCore import QFileSystemWatcher, QLockFile, QProcess, QTimer
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+SELF = Path(__file__).resolve()
 STATUS_DIR = Path("/var/lib/ixin-update")
 STATUS_FILE = STATUS_DIR / "status.json"
 CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "ixin" / "update-notifier.json"
@@ -80,6 +81,30 @@ class Notifier:
         self.timer = QTimer(interval=60_000, timeout=self.refresh)
         self.timer.start()
         QTimer.singleShot(3000, self.refresh)
+
+        # Mise à jour du notificateur lui-même (paquet ixin-update) : il se relance tout seul,
+        # sans attendre la prochaine ouverture de session.
+        self.self_watcher = QFileSystemWatcher([str(SELF)])
+        self.self_watcher.fileChanged.connect(lambda _: QTimer.singleShot(10_000, self.restart))
+
+    def restart(self):
+        # Attendre la fin complète de l'installation : la même mise à jour peut aussi remplacer
+        # Python ou PyQt6, qu'il ne faut pas charger à moitié installés.
+        if (not SELF.exists() or Path("/var/lib/pacman/db.lck").exists()
+                or self.status.get("state") == "installing"):
+            QTimer.singleShot(10_000, self.restart)
+            return
+        lock = getattr(self.app, "lock", None)
+        if lock is not None:
+            lock.unlock()                          # le nouveau processus garde le même PID
+        sys.stderr.write("ixin-update-notifier : nouvelle version installée, relance\n")
+        sys.stderr.flush()
+        try:
+            os.execv("/usr/bin/python3", ["python3", str(SELF), *sys.argv[1:]])
+        except OSError as e:
+            sys.stderr.write(f"ixin-update-notifier : relance impossible ({e})\n")
+            if lock is not None:
+                lock.tryLock(100)
 
     # ── mémoire des notifications déjà affichées ──
     def load_seen(self):
@@ -211,9 +236,10 @@ class Notifier:
         if state == "error" and self.once("error", digest(message, st.get("error"))):
             self.notify("IXIN Update : problème", message, "dialog-warning", "normal", {"open": "Voir les détails"})
 
-        # 5. Annonce de l'équipe IXIN
+        # 5. Annonce de l'équipe IXIN (une fois par message : la politique est re-signée chaque
+        #    semaine avec un nouveau numéro de série, le même message ne doit pas réapparaître)
         notice = st.get("notice")
-        if notice and self.once("notice", notice.get("serial")):
+        if notice and self.once("notice", digest(notice.get("level"), notice.get("text"))):
             urgency = "critical" if notice.get("level") == "critical" else "normal"
             self.notify("Annonce IXIN", notice.get("text", ""), "ixin", urgency, {"open": "Ouvrir"})
 
@@ -257,6 +283,11 @@ def main():
     app.setApplicationName("ixin-update-notifier")
     app.setDesktopFileName("ixin-update")
     app.setQuitOnLastWindowClosed(False)
+    # Qt 6 : l'icône KDE de la zone de notification tient un « verrou de sortie » qu'elle relâche
+    # quand on la masque ; Qt quitterait alors l'application dès que l'icône disparaît (constaté :
+    # plus aucune notification après la première mise à jour). Le notificateur doit rester actif.
+    app.setQuitLockEnabled(False)
+    app.lock = lock
     app.notifier = Notifier(app)   # garde une référence pendant toute la session
     return app.exec()
 
