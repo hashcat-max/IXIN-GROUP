@@ -1,0 +1,11 @@
+{
+  "_aide": "Politique IXIN Update, publiée et signée automatiquement avec le dépôt [ixin]. Voir docs/MISES-A-JOUR.md. Les champs version, serial, issued et expires sont ajoutés à la publication.",
+  "_urgent": "true = les PC IXIN OS installent les mises à jour dans l'heure (failles graves). Remettre à false ensuite.",
+  "_hold": "Liste de paquets à ne PAS mettre à jour pour l'instant (mise à jour Arch défectueuse), ex. [\"mesa\"].",
+  "_news_ack": "Liens d'annonces Arch Linux vérifiées par l'équipe IXIN (débloque les mises à jour automatiques).",
+  "_notice": "Message affiché aux utilisateurs, ex. {\"level\": \"info\", \"text\": \"...\"}, ou null.",
+  "urgent": false,
+  "hold": [],
+  "news_ack": [],
+  "notice": null
+}

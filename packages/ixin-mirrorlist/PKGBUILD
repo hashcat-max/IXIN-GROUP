@@ -1,0 +1,16 @@
+# Maintainer: IXIN Group <https://getixin.com>
+# Version calculée automatiquement par tools/build-packages.sh (date du dernier commit du paquet).
+pkgname=ixin-mirrorlist
+pkgver=0
+pkgrel=1
+pkgdesc="Serveurs du dépôt de mises à jour [ixin]"
+arch=('any')
+url="https://github.com/hashcat-max/IXIN-GROUP"
+license=('LicenseRef-IXIN')
+backup=('etc/pacman.d/ixin-mirrorlist')
+source=('ixin-mirrorlist')
+sha256sums=('SKIP')
+
+package() {
+  install -Dm644 ixin-mirrorlist "$pkgdir/etc/pacman.d/ixin-mirrorlist"
+}

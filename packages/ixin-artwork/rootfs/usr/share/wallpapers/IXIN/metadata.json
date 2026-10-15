@@ -1,0 +1,8 @@
+{
+    "KPlugin": {
+        "Authors": [ { "Name": "IXIN Group" } ],
+        "Id": "IXIN",
+        "License": "LicenseRef-IXIN",
+        "Name": "IXIN Void"
+    }
+}

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Propage les mises à jour du thème IXIN là où elles sont lues au démarrage.
+#   grub     : copie le thème sur /boot (seule partie lisible par GRUB, le reste étant chiffré)
+#   plymouth : reconstruit l'initramfs si le thème IXIN y est utilisé
+[[ -d /run/archiso ]] && exit 0
+systemd-detect-virt --chroot >/dev/null 2>&1 && exit 0
+case "$1" in
+  grub)
+    # Le thème est copié si GRUB l'utilise depuis /boot (installation IXIN OS).
+    if [[ -d /boot/grub/themes/ixin ]] || grep -qs '/boot/grub/themes/ixin' /etc/default/grub; then
+      mkdir -p /boot/grub/themes
+      rm -rf /boot/grub/themes/ixin.new
+      cp -r /usr/share/grub/themes/ixin /boot/grub/themes/ixin.new &&
+        rm -rf /boot/grub/themes/ixin && mv /boot/grub/themes/ixin.new /boot/grub/themes/ixin
+    fi ;;
+  plymouth)
+    # Reconstruire l'initramfs seulement si les images du thème ont réellement changé.
+    if grep -qs '^Theme=ixin' /etc/plymouth/plymouthd.conf && grep -qE '^HOOKS=.*\bplymouth\b' /etc/mkinitcpio.conf; then
+      sum="$(cat /usr/share/plymouth/themes/ixin/* | sha256sum | cut -d' ' -f1)"
+      if [[ "$(cat /var/lib/ixin/plymouth-theme.sha256 2>/dev/null)" != "$sum" ]]; then
+        mkinitcpio -P && mkdir -p /var/lib/ixin && echo "$sum" > /var/lib/ixin/plymouth-theme.sha256
+      fi
+    fi ;;
+esac
+exit 0

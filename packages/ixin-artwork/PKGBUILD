@@ -1,0 +1,28 @@
+# Maintainer: IXIN Group <https://getixin.com>
+# Version calculée automatiquement par tools/build-packages.sh (date du dernier commit du paquet).
+pkgname=ixin-artwork
+pkgver=0
+pkgrel=1
+pkgdesc="Identité visuelle d'IXIN OS : logos, fonds d'écran, thèmes Plasma, Plymouth, GRUB et SDDM"
+arch=('any')
+url="https://github.com/hashcat-max/IXIN-GROUP"
+license=('LicenseRef-IXIN')
+depends=('bash' 'hicolor-icon-theme')
+makedepends=('grub' 'ttf-dejavu' 'plymouth')
+optdepends=('plymouth: écran de démarrage IXIN' 'grub: menu de démarrage IXIN' 'plasma-workspace: thème global et écran de chargement')
+install=ixin-artwork.install
+
+package() {
+  cp -a "$startdir/rootfs/." "$pkgdir/"
+
+  # Polices du thème GRUB (format pf2)
+  local theme="$pkgdir/usr/share/grub/themes/ixin" f
+  for f in DejaVuSans:14 DejaVuSans:16 DejaVuSans:18 DejaVuSans-Bold:18 DejaVuSansMono:14; do
+    grub-mkfont -s "${f#*:}" -o "$theme/${f%%:*}-${f#*:}.pf2" "/usr/share/fonts/TTF/${f%%:*}.ttf"
+  done
+
+  # Animation de chargement du thème Plymouth (images du thème « spinner »)
+  local spinner=/usr/share/plymouth/themes/spinner
+  cp "$spinner"/{animation,throbber}-*.png "$pkgdir/usr/share/plymouth/themes/ixin/"
+  cp "$spinner"/{bullet,capslock,entry,keyboard,keymap-render,lock}.png "$pkgdir/usr/share/plymouth/themes/ixin/"
+}

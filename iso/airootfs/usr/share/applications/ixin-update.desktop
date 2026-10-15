@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Mettre à jour IXIN OS
-Comment=Mise à jour complète du système
-Exec=konsole --hold -e /usr/local/bin/ixin-update
-Icon=system-software-update
-Terminal=false
-Categories=System;

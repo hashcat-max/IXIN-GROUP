@@ -1,0 +1,5 @@
+# IXIN OS : les mises à jour du système sont gérées par IXIN Update (Centre IXIN).
+# Discover reste disponible pour installer des applications (Flathub).
+[Global]
+RequiredNotificationInterval=-1
+UseUnattendedUpdates=false

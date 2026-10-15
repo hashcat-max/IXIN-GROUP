@@ -1,0 +1,18 @@
+# Maintainer: IXIN Group <https://getixin.com>
+# Version calculée automatiquement par tools/build-packages.sh (date du dernier commit du paquet).
+pkgname=ixin-keyring
+pkgver=0
+pkgrel=1
+pkgdesc="Clés OpenPGP de l'équipe IXIN (vérification des mises à jour d'IXIN OS)"
+arch=('any')
+url="https://github.com/hashcat-max/IXIN-GROUP"
+license=('LicenseRef-IXIN')
+install=ixin-keyring.install
+# ixin.gpg / ixin-trusted / ixin-revoked sont générés par tools/build-packages.sh
+# à partir de la clé de signature (secret GitHub IXIN_SIGNING_KEY).
+source=('ixin.gpg' 'ixin-trusted' 'ixin-revoked')
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm644 -t "$pkgdir/usr/share/pacman/keyrings" ixin.gpg ixin-trusted ixin-revoked
+}

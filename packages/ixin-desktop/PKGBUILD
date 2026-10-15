@@ -1,0 +1,11 @@
+# Maintainer: IXIN Group <https://getixin.com>
+# Version calculée automatiquement par tools/build-packages.sh (date du dernier commit du paquet).
+# Méta-paquet : ajouter une dépendance ici l'installe automatiquement sur tous les PC IXIN OS.
+pkgname=ixin-desktop
+pkgver=0
+pkgrel=1
+pkgdesc="IXIN OS — ensemble des composants IXIN (méta-paquet)"
+arch=('any')
+url="https://github.com/hashcat-max/IXIN-GROUP"
+license=('LicenseRef-IXIN')
+depends=('ixin-keyring' 'ixin-mirrorlist' 'ixin-artwork' 'ixin-settings' 'ixin-tools' 'ixin-update')

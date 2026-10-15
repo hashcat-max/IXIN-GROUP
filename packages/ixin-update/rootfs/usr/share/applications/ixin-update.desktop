@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Mises à jour IXIN
+Name[en]=IXIN Updates
+Comment=État et installation des mises à jour d'IXIN OS
+Exec=/usr/bin/ixin-center --tab updates
+Icon=system-software-update
+Terminal=false
+Categories=System;Settings;
+Keywords=update;mise à jour;securite;security;patch;

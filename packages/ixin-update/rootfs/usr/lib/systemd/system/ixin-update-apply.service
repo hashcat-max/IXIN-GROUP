@@ -1,0 +1,12 @@
+[Unit]
+Description=IXIN Update — installer les mises à jour maintenant
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/run/archiso
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ixin-update apply --reason "demande de l'utilisateur"
+KillMode=process
+TimeoutStartSec=4h
+TimeoutStopSec=30min

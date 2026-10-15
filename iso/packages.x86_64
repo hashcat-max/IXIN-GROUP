@@ -164,7 +164,7 @@ obs-studio
 gimp
 flatpak
 discover
-packagekit-qt6
+
 timeshift
 snapper
 btrfs-assistant
@@ -215,6 +215,8 @@ lynis
 arch-audit
 audit
 opensnitch
+# ── IXIN (logiciels et réglages IXIN, mis à jour par IXIN Update) ──
+ixin-desktop
 # ── Installation ──
 calamares
 ckbcomp

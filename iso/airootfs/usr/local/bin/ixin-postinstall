@@ -32,6 +32,7 @@ PRESET
           /etc/systemd/journald.conf.d/volatile-storage.conf \
           /etc/systemd/logind.conf.d/do-not-suspend.conf \
           /etc/pacman.d/hooks/uncomment-mirrors.hook \
+          /etc/xdg/kxkbrc \
           /usr/share/applications/ixin-install.desktop \
           /usr/local/bin/livecd-sound
     rm -rf /usr/local/share/livecd-sound
@@ -44,7 +45,8 @@ PRESET
     log "Initialisation du trousseau pacman"
     rm -rf /etc/pacman.d/gnupg
     pacman-key --init
-    pacman-key --populate archlinux chaotic || pacman-key --populate archlinux
+    # Toutes les clés fournies : Arch Linux, Chaotic-AUR et l'équipe IXIN (ixin-keyring)
+    pacman-key --populate
 
     log "Retrait des paquets propres au live"
     pacman -Rdd --noconfirm calamares mkinitcpio-archiso 2>/dev/null || true
@@ -71,6 +73,9 @@ finalize() {
     mkdir -p /boot/grub/themes
     rm -rf /boot/grub/themes/ixin
     cp -r /usr/share/grub/themes/ixin /boot/grub/themes/ixin
+
+    log "Retrait des scripts propres au live"
+    rm -f /usr/local/bin/ixin-install /usr/local/bin/ixin-postinstall
 }
 
 case "${1:-}" in

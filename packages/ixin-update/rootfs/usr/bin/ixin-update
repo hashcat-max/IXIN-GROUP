@@ -1,0 +1,1066 @@
+#!/usr/bin/env python3
+"""IXIN Update — mises à jour automatiques d'IXIN OS.
+
+  ixin-update                      état + mise à jour interactive (terminal)
+  ixin-update status [--json]      état des mises à jour
+  ixin-update check [--force]      rechercher les mises à jour            (root)
+  ixin-update apply                installer maintenant                   (root)
+  ixin-update auto                 lancé par ixin-update.timer            (root)
+  ixin-update snapshot [--hook]    point de restauration Btrfs (Timeshift) (root)
+  ixin-update set-mode MODE        auto | notify | manual                 (root, via pkexec)
+  ixin-update boot-check           répare /boot après une restauration     (root, au démarrage)
+
+Sources de mises à jour :
+  - dépôts Arch Linux (core, extra, multilib) et Chaotic-AUR ;
+  - dépôt [ixin] signé (paquets IXIN poussés par l'équipe IXIN) ;
+  - politique IXIN signée (policy.json) : mise à jour urgente, paquets bloqués, annonces.
+"""
+
+import argparse
+import configparser
+import datetime as dt
+import fcntl
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+VENDOR_CONF = Path("/usr/lib/ixin/update.conf")
+ETC_CONF = Path("/etc/ixin/update.conf")
+STATE_DIR = Path("/var/lib/ixin-update")
+STATUS_FILE = STATE_DIR / "status.json"     # public (lu par le notificateur et le Centre IXIN)
+STATE_FILE = STATE_DIR / "state.json"       # interne
+POLICY_CACHE = STATE_DIR / "policy.json"
+TEMP_DB = STATE_DIR / "db"                  # base pacman temporaire (comme checkupdates)
+LOG_FILE = Path("/var/log/ixin-update.log")
+RUN_DIR = Path("/run/ixin-update")
+LOCK_FILE = Path("/run/ixin-update.lock")
+KEYRING = Path("/usr/share/pacman/keyrings/ixin.gpg")
+TRUSTED = Path("/usr/share/pacman/keyrings/ixin-trusted")
+PACMAN_CONF = Path("/etc/pacman.conf")
+PACMAN_LOCK = Path("/var/lib/pacman/db.lck")
+ARCH_NEWS_URL = "https://archlinux.org/feeds/news/"
+
+# Dépôts que l'on peut ignorer temporairement s'ils sont injoignables,
+# pour que les correctifs de sécurité Arch continuent d'arriver.
+SKIPPABLE_REPOS = {"ixin", "chaotic-aur"}
+KEYRING_PKGS = ("archlinux-keyring", "chaotic-keyring", "ixin-keyring")
+# Paquets dont la mise à jour nécessite un redémarrage pour être prise en compte.
+REBOOT_PATTERNS = [re.compile(p) for p in (
+    r"^linux(-zen|-lts|-hardened|-rt)?$", r"^linux-firmware", r"^(lib32-)?nvidia", r"^(amd|intel)-ucode$",
+    r"^systemd$", r"^glibc$", r"^(lib32-)?mesa$", r"^cryptsetup$", r"^dbus", r"^mkinitcpio$",
+    r"^plymouth$", r"^plasma-workspace$", r"^kwin$", r"^qt6-base$",
+)]
+GAME_MARKERS = ("steamapps/common/", "wineserver", "gamescope", "wine64-preloader", "wine-preloader")
+
+DEFAULTS = {
+    "mode": "auto",
+    "check_interval_hours": "4",
+    "install_interval_hours": "24",
+    "snapshots": "yes",
+    "snapshots_keep": "5",
+    "flatpak": "yes",
+    "require_ac": "yes",
+    "min_battery": "40",
+    "defer_while_gaming": "yes",
+    "respect_metered": "yes",
+    "arch_news_check": "yes",
+    "arch_news_grace_days": "3",
+    "policy_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/repo/policy.json",
+}
+MODES = ("auto", "notify", "manual")
+MODE_LABELS = {
+    "auto": "Automatique (recommandé)",
+    "notify": "Me prévenir seulement",
+    "manual": "Manuel",
+}
+
+
+# ───────────────────────────── utilitaires ─────────────────────────────
+
+def now():
+    return time.time()
+
+
+def iso(ts=None):
+    if not ts:
+        return None
+    return dt.datetime.fromtimestamp(ts, dt.timezone.utc).isoformat(timespec="seconds")
+
+
+def log(msg):
+    line = f"{dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {msg}"
+    print(msg, flush=True)
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass
+
+
+def run(cmd, timeout=None, env=None, check=False):
+    # Sorties en anglais (LC_ALL=C) : elles sont analysées par ce programme.
+    env = env or dict(os.environ, LC_ALL="C")
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+    except FileNotFoundError:
+        return subprocess.CompletedProcess(cmd, 127, "", f"{cmd[0]}: introuvable")
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, 124, "", f"{cmd[0]}: délai dépassé")
+    if check and r.returncode != 0:
+        raise RuntimeError(f"{' '.join(cmd)} : {r.stderr.strip() or r.stdout.strip()}")
+    return r
+
+
+def atomic_write(path, data, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(data)
+    os.chmod(tmp, mode)
+    os.replace(tmp, path)
+
+
+def read_json(path, default):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
+def boot_id():
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        return ""
+
+
+def is_live():
+    return Path("/run/archiso").exists()
+
+
+def in_chroot():
+    return run(["systemd-detect-virt", "--chroot"]).returncode == 0
+
+
+def require_root():
+    if os.geteuid() != 0:
+        sys.exit("ixin-update : cette commande doit être lancée en root (sudo).")
+
+
+class Lock:
+    """Un seul ixin-update actif à la fois."""
+
+    def __init__(self, wait=False):
+        self.wait = wait
+        self.fd = None
+
+    def __enter__(self):
+        LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        self.fd = open(LOCK_FILE, "w")
+        flags = fcntl.LOCK_EX if self.wait else fcntl.LOCK_EX | fcntl.LOCK_NB
+        try:
+            fcntl.flock(self.fd, flags)
+        except BlockingIOError:
+            self.fd.close()
+            raise SystemExit(0) from None
+        return self
+
+    def __exit__(self, *exc):
+        fcntl.flock(self.fd, fcntl.LOCK_UN)
+        self.fd.close()
+
+
+# ───────────────────────────── configuration / état ─────────────────────────────
+
+def load_config():
+    cp = configparser.ConfigParser()
+    cp.read_dict({"update": DEFAULTS})
+    cp.read([VENDOR_CONF, ETC_CONF], encoding="utf-8")
+    cfg = cp["update"]
+    if cfg.get("mode") not in MODES:
+        cfg["mode"] = "auto"
+    return cfg
+
+
+def load_state():
+    return read_json(STATE_FILE, {})
+
+
+def save_state(st):
+    atomic_write(STATE_FILE, json.dumps(st, indent=1, ensure_ascii=False), 0o600)
+
+
+def load_status():
+    return read_json(STATUS_FILE, {})
+
+
+def save_status(**changes):
+    status = load_status()
+    status.update(changes)
+    status["version"] = 1
+    status["updated"] = iso(now())
+    status["mode"] = load_config().get("mode")
+    atomic_write(STATUS_FILE, json.dumps(status, indent=1, ensure_ascii=False))
+    return status
+
+
+def add_history(entry):
+    status = load_status()
+    history = status.get("history", [])
+    history.insert(0, entry)
+    save_status(history=history[:30])
+
+
+# ───────────────────────────── conditions ─────────────────────────────
+
+def power_state():
+    """(sur secteur ?, pourcentage batterie le plus bas ou None)."""
+    ac, caps = False, []
+    base = Path("/sys/class/power_supply")
+    if not base.exists():
+        return True, None
+    for dev in base.iterdir():
+        try:
+            kind = (dev / "type").read_text().strip()
+            if kind in ("Mains", "USB", "USB_C", "USB_PD"):
+                ac = ac or (dev / "online").read_text().strip() == "1"
+            elif kind == "Battery":
+                scope = dev / "scope"
+                if scope.exists() and scope.read_text().strip() == "Device":
+                    continue  # souris, manette…
+                caps.append(int((dev / "capacity").read_text().strip()))
+        except (OSError, ValueError):
+            continue
+    if not caps:
+        return True, None  # PC fixe
+    return ac, min(caps)
+
+
+def gaming():
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode(errors="ignore")
+        except OSError:
+            continue
+        if any(m in cmd for m in GAME_MARKERS):
+            return True
+    return False
+
+
+def metered():
+    r = run(["busctl", "get-property", "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager",
+             "org.freedesktop.NetworkManager", "Metered"], timeout=10)
+    # NMMetered : 1 = oui, 3 = probablement oui
+    return r.returncode == 0 and r.stdout.strip() in ("u 1", "u 3")
+
+
+def online():
+    r = run(["nm-online", "-q", "-t", "20"], timeout=30)
+    if r.returncode == 127:      # NetworkManager absent : on tente quand même
+        return True
+    return r.returncode == 0
+
+
+def pacman_busy_process():
+    for pid in os.listdir("/proc"):
+        if pid.isdigit():
+            try:
+                comm = Path(f"/proc/{pid}/comm").read_text().strip()
+            except OSError:
+                continue
+            if comm in ("pacman", "pamac", "pamac-daemon", "packagekitd", "yay", "paru"):
+                return True
+    return False
+
+
+def pacman_busy():
+    """Une autre installation est-elle en cours ? Supprime un verrou orphelin."""
+    if not PACMAN_LOCK.exists():
+        return False
+    if pacman_busy_process():
+        return True
+    age = now() - PACMAN_LOCK.stat().st_mtime
+    if age > 600:
+        log(f"Verrou pacman orphelin supprimé (âge {int(age)} s)")
+        PACMAN_LOCK.unlink(missing_ok=True)
+        return False
+    return True
+
+
+def postpone_reasons(cfg, security):
+    reasons = []
+    if pacman_busy():
+        reasons.append("une autre installation de logiciels est en cours")
+    if cfg.getboolean("defer_while_gaming") and gaming():
+        reasons.append("un jeu est en cours")
+    ac, battery = power_state()
+    if battery is not None and not ac:
+        limit = 20 if security else cfg.getint("min_battery")
+        if not security and cfg.getboolean("require_ac"):
+            reasons.append("l'ordinateur est sur batterie")
+        elif battery < limit:
+            reasons.append(f"batterie trop faible ({battery} %)")
+    if not security and cfg.getboolean("respect_metered") and metered():
+        reasons.append("connexion limitée (forfait mobile)")
+    return reasons
+
+
+# ───────────────────────────── politique IXIN signée ─────────────────────────────
+
+def trusted_fingerprints():
+    fprs = set()
+    try:
+        for line in TRUSTED.read_text().splitlines():
+            fpr = line.split(":", 1)[0].strip().upper()
+            if re.fullmatch(r"[0-9A-F]{40}", fpr):
+                fprs.add(fpr)
+    except OSError:
+        pass
+    return fprs
+
+
+def verify_signature(data_path, sig_path):
+    """Vrai seulement si la signature est valide ET faite par une clé IXIN de confiance."""
+    fprs = trusted_fingerprints()
+    if not fprs or not KEYRING.exists():
+        return False
+    r = run(["gpgv", "--status-fd", "1", "--keyring", str(KEYRING), str(sig_path), str(data_path)], timeout=30)
+    if r.returncode != 0:
+        return False
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and parts[0] == "[GNUPG:]" and parts[1] == "VALIDSIG":
+            if parts[2].upper() in fprs or parts[-1].upper() in fprs:
+                return True
+    return False
+
+
+def http_get(url, dest, timeout=30):
+    req = urllib.request.Request(url, headers={"User-Agent": "ixin-update/1"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest, "wb") as f:
+        shutil.copyfileobj(resp, f)
+
+
+def policy_valid(p, st):
+    try:
+        if p.get("version") != 1:
+            return False
+        if int(p.get("serial", 0)) < int(st.get("policy_serial", 0)):
+            return False                       # rejeu d'une ancienne politique
+        expires = dt.datetime.fromisoformat(p["expires"].replace("Z", "+00:00")).timestamp()
+        return expires > now()
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return False
+
+
+def refresh_policy(cfg, st):
+    """Télécharge et vérifie la politique IXIN. Retourne la politique valide (ou None)."""
+    url = cfg.get("policy_url", "").strip()
+    policy = None
+    if url:
+        RUN_DIR.mkdir(parents=True, exist_ok=True)
+        data, sig = RUN_DIR / "policy.json", RUN_DIR / "policy.json.sig"
+        try:
+            http_get(url, data)
+            http_get(url + ".sig", sig)
+            if verify_signature(data, sig):
+                candidate = json.loads(data.read_text(encoding="utf-8"))
+                if policy_valid(candidate, st):
+                    policy = candidate
+                    st["policy_serial"] = int(candidate.get("serial", 0))
+                    shutil.copy(data, POLICY_CACHE)
+                    shutil.copy(sig, str(POLICY_CACHE) + ".sig")
+                else:
+                    log("Politique IXIN ignorée : expirée ou plus ancienne que la précédente")
+            else:
+                log("Politique IXIN ignorée : signature absente ou invalide")
+        except (OSError, ValueError) as e:
+            log(f"Politique IXIN indisponible ({e.__class__.__name__}) — utilisation de la copie locale")
+    if policy is None and POLICY_CACHE.exists():
+        cached_sig = Path(str(POLICY_CACHE) + ".sig")
+        if cached_sig.exists() and verify_signature(POLICY_CACHE, cached_sig):
+            candidate = read_json(POLICY_CACHE, None)
+            if candidate and policy_valid(candidate, st):
+                policy = candidate
+    return policy
+
+
+def policy_holds(policy):
+    if not policy:
+        return []
+    return [p for p in policy.get("hold", []) if re.fullmatch(r"[a-zA-Z0-9@._+-]+", str(p))]
+
+
+def policy_urgent(policy, st):
+    return bool(policy and policy.get("urgent") and int(policy.get("serial", 0)) > int(st.get("urgent_done_serial", 0)))
+
+
+# ───────────────────────────── actualités Arch Linux ─────────────────────────────
+
+def arch_news_blocking(cfg, policy, st):
+    """Annonce Arch récente (intervention manuelle possible) non validée par IXIN ?"""
+    if not cfg.getboolean("arch_news_check"):
+        return None
+    grace = cfg.getfloat("arch_news_grace_days") * 86400
+    acked = set((policy or {}).get("news_ack", []))
+    since = st.get("last_success_ts") or st.get("installed_ts") or now()
+    try:
+        RUN_DIR.mkdir(parents=True, exist_ok=True)
+        dest = RUN_DIR / "archnews.xml"
+        http_get(ARCH_NEWS_URL, dest, timeout=20)
+        root = ET.parse(dest).getroot()
+    except (OSError, ET.ParseError):
+        return None
+    for item in root.iter("item"):
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        try:
+            published = dt.datetime.strptime(item.findtext("pubDate", ""), "%a, %d %b %Y %H:%M:%S %z").timestamp()
+        except ValueError:
+            continue
+        if published > since and now() - published < grace and link not in acked and title not in acked:
+            return {"title": title, "link": link, "published": iso(published)}
+    return None
+
+
+# ───────────────────────────── pacman ─────────────────────────────
+
+def pacman_conf(excluded):
+    if not excluded:
+        return str(PACMAN_CONF)
+    out, skip = [], False
+    for line in PACMAN_CONF.read_text().splitlines():
+        m = re.match(r"^\s*\[([^\]]+)\]\s*$", line)
+        if m:
+            skip = m.group(1) in excluded
+        if not skip:
+            out.append(line)
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    path = RUN_DIR / "pacman.conf"
+    path.write_text("\n".join(out) + "\n")
+    return str(path)
+
+
+def failed_repos(output):
+    names = set()
+    patterns = (
+        r"failed retrieving file '([^']+?)\.(?:db|files)(?:\.sig)?'",
+        r"^\s*(\S+?)\.db failed to download",
+        r"error: failed to update (\S+?)(?: |$|\()",
+        r"error: (\S+?): (?:signature|key|missing required signature|invalid or corrupted database)",
+        r"database '([^']+)' is not valid",
+    )
+    for pat in patterns:
+        names.update(re.findall(pat, output, flags=re.M))
+    return {n.strip(":") for n in names}
+
+
+def sync_temp_db():
+    """Synchronise une copie des bases (sans toucher au système). Retourne (conf, dépôts ignorés, erreur)."""
+    (TEMP_DB / "sync").mkdir(parents=True, exist_ok=True)
+    local = TEMP_DB / "local"
+    if not local.is_symlink():
+        if local.exists():
+            shutil.rmtree(local)
+        local.symlink_to("/var/lib/pacman/local")
+    excluded = set()
+    for _ in range(len(SKIPPABLE_REPOS) + 1):
+        conf = pacman_conf(excluded)
+        r = run(["pacman", "-Sy", "--dbpath", str(TEMP_DB), "--config", conf, "--logfile", "/dev/null",
+                 "--noconfirm", "--color", "never"], timeout=900)
+        if r.returncode == 0:
+            return conf, excluded, None
+        output = r.stdout + r.stderr
+        bad = (failed_repos(output) & SKIPPABLE_REPOS) - excluded
+        if not bad:
+            errors = [l.strip() for l in output.splitlines() if l.startswith("error:")]
+            return None, excluded, "\n".join(errors[-6:]) or output.strip()[-400:]
+        log(f"Dépôt(s) injoignable(s) ou non vérifiable(s), ignoré(s) pour cette fois : {', '.join(sorted(bad))}")
+        excluded |= bad
+    return None, excluded, "Impossible de synchroniser les dépôts"
+
+
+def pending_updates(conf, holds):
+    cmd = ["pacman", "-Qu", "--dbpath", str(TEMP_DB), "--config", conf, "--color", "never"]
+    r = run(cmd, timeout=120)
+    updates = []
+    for line in r.stdout.splitlines():
+        m = re.match(r"^(\S+) (\S+) -> (\S+)", line)
+        if m and "[ignored]" not in line and m.group(1) not in holds:
+            updates.append({"name": m.group(1), "old": m.group(2), "new": m.group(3), "security": False})
+    return updates
+
+
+def security_advisories():
+    """Paquets installés vulnérables dont le correctif est disponible (arch-audit)."""
+    r = run(["arch-audit", "-u", "-b", str(TEMP_DB), "--json"], timeout=180)
+    if r.returncode != 0:
+        return None
+    try:
+        avgs = json.loads(r.stdout or "[]")
+    except ValueError:
+        return None
+    result = {}
+    for avg in avgs:
+        for pkg in avg.get("packages", []):
+            entry = result.setdefault(pkg, {"severity": avg.get("severity", ""), "cves": [], "avg": []})
+            entry["cves"].extend(avg.get("issues", []))
+            entry["avg"].append(avg.get("name"))
+    return result
+
+
+def installed_versions():
+    r = run(["pacman", "-Q", "--color", "never"], timeout=60)
+    return dict(line.split(" ", 1) for line in r.stdout.splitlines() if " " in line)
+
+
+def free_space_gb(path="/var/cache/pacman/pkg"):
+    try:
+        return shutil.disk_usage(path).free / 1e9
+    except OSError:
+        return 99
+
+
+# ───────────────────────────── points de restauration ─────────────────────────────
+
+def root_btrfs():
+    r = run(["findmnt", "-no", "FSTYPE,OPTIONS,UUID", "/"])
+    parts = r.stdout.split()
+    if len(parts) < 3 or parts[0] != "btrfs":
+        return None
+    if "subvol=/@" not in parts[1].split(",") and "subvol=@" not in parts[1].split(","):
+        return None                                   # Timeshift exige la disposition @ / @home
+    return parts[2]
+
+
+def ensure_timeshift():
+    uuid = root_btrfs()
+    if not uuid or not shutil.which("timeshift"):
+        return False
+    conf = Path("/etc/timeshift/timeshift.json")
+    current = read_json(conf, {})
+    if current.get("btrfs_mode") == "true" and current.get("backup_device_uuid") == uuid:
+        return True
+    base = read_json("/etc/timeshift/default.json", {}) or current
+    base.update({
+        "backup_device_uuid": uuid,
+        "parent_device_uuid": "",
+        "do_first_run": "false",
+        "btrfs_mode": "true",
+        "include_btrfs_home": "false",
+        "stop_cron_emails": "true",
+    })
+    atomic_write(conf, json.dumps(base, indent=2))
+    log(f"Timeshift configuré en mode Btrfs (volume {uuid})")
+    return True
+
+
+def list_snapshots():
+    r = run(["timeshift", "--list", "--scripted"], timeout=120)
+    snaps = []
+    for line in r.stdout.splitlines():
+        m = re.match(r"^\s*\d+\s+>\s+(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\s+(\S*)\s*(.*)$", line)
+        if m:
+            snaps.append({"name": m.group(1), "tags": m.group(2), "comment": m.group(3).strip()})
+    return snaps
+
+
+def create_snapshot(cfg, comment):
+    if not cfg.getboolean("snapshots") or not ensure_timeshift():
+        return None
+    r = run(["timeshift", "--create", "--scripted", "--yes", "--comments", comment, "--tags", "O"], timeout=900)
+    m = re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", r.stdout)
+    if r.returncode != 0 or not m:
+        log(f"Point de restauration impossible : {(r.stderr or r.stdout).strip()[-300:]}")
+        return None
+    log(f"Point de restauration créé : {m.group(1)} ({comment})")
+    prune_snapshots(cfg)
+    return m.group(1)
+
+
+def prune_snapshots(cfg):
+    keep = max(1, cfg.getint("snapshots_keep"))
+    ours = [s for s in list_snapshots() if s["comment"].startswith("IXIN")]
+    initial = [s for s in ours if "Installation initiale" in s["comment"]]
+    others = [s for s in ours if s not in initial]
+    for snap in others[:-keep]:
+        run(["timeshift", "--delete", "--snapshot", snap["name"], "--scripted", "--yes"], timeout=600)
+        log(f"Ancien point de restauration supprimé : {snap['name']}")
+
+
+# ───────────────────────────── recherche ─────────────────────────────
+
+def do_check(cfg, policy, st, download):
+    holds = policy_holds(policy)
+    save_status(state="checking", message="Recherche des mises à jour…", postponed=None)
+    if not online():
+        save_status(state="idle", message="Hors ligne : nouvelle tentative plus tard")
+        return None
+    conf, excluded, err = sync_temp_db()
+    st["last_check_ts"] = now()
+    if err:
+        log(f"Échec de la recherche : {err}")
+        save_status(state="error", last_check=iso(now()), message="Impossible de joindre les serveurs de mise à jour",
+                    error=err)
+        return None
+    updates = pending_updates(conf, holds)
+    advisories = security_advisories()
+    for u in updates:
+        adv = (advisories or {}).get(u["name"])
+        if adv:
+            u.update(security=True, severity=adv["severity"], cves=sorted(set(adv["cves"]))[:20])
+        elif policy_urgent(policy, st) and u["name"].startswith("ixin-"):
+            u.update(security=True, severity="IXIN")
+    security = sum(1 for u in updates if u["security"])
+    st["pending_security"] = security > 0
+    downloaded = False
+    if updates and download:
+        if free_space_gb() < 2:
+            save_status(state="error", message="Espace disque insuffisant pour télécharger les mises à jour")
+            return None
+        if security or not (cfg.getboolean("respect_metered") and metered()):
+            cmd = ["pacman", "-Suw", "--noconfirm", "--dbpath", str(TEMP_DB), "--config", conf,
+                   "--logfile", "/dev/null", "--color", "never"] + [f"--ignore={h}" for h in holds]
+            downloaded = run(cmd, timeout=7200).returncode == 0
+    msg = "Votre système est à jour" if not updates else (
+        f"{len(updates)} mise(s) à jour disponible(s)" + (f", dont {security} de sécurité" if security else ""))
+    save_status(state="idle", last_check=iso(now()), updates=updates, total_updates=len(updates),
+                security_updates=security, downloaded=downloaded, excluded_repos=sorted(excluded),
+                holds=holds, audit_available=advisories is not None, message=msg, error=None)
+    log(f"Recherche terminée : {msg}" + (f" (ignorés : {', '.join(sorted(excluded))})" if excluded else ""))
+    return {"conf": conf, "excluded": excluded, "updates": updates, "security": security, "holds": holds}
+
+
+# ───────────────────────────── installation ─────────────────────────────
+
+class ShutdownGuard:
+    """Ignore SIGTERM/SIGINT pendant une transaction pacman (ne jamais l'interrompre)."""
+
+    def __enter__(self):
+        self.old = {s: signal.signal(s, lambda *_: log("Arrêt demandé : attente de la fin de l'installation"))
+                    for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)}
+        return self
+
+    def __exit__(self, *exc):
+        for s, h in self.old.items():
+            signal.signal(s, h)
+
+
+def run_logged(cmd, verbose=False, env=None):
+    """Exécute une commande en journalisant sa sortie ; renvoie (code, sortie)."""
+    inhibit = ["systemd-inhibit", "--what=shutdown:sleep:idle", "--who=IXIN Update",
+               "--why=Installation des mises à jour — n'éteignez pas l'ordinateur", "--mode=block"]
+    if shutil.which("systemd-inhibit") and not in_chroot():
+        cmd = inhibit + cmd
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env,
+                            start_new_session=True)
+    lines = []
+    with open(LOG_FILE, "a", encoding="utf-8") as logf:
+        for line in proc.stdout:
+            lines.append(line)
+            logf.write(line)
+            if verbose:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+    return proc.wait(), "".join(lines)
+
+
+def reboot_needed(changed):
+    return sorted(n for n in changed if any(p.search(n) for p in REBOOT_PATTERNS))
+
+
+def do_apply(cfg, policy, st, reason, verbose=False):
+    if is_live():
+        save_status(state="idle", message="Les mises à jour sont désactivées en mode live")
+        return False
+    if pacman_busy():
+        save_status(state="idle", message="Une autre installation est en cours : mise à jour reportée")
+        return False
+    if free_space_gb("/") < 2:
+        save_status(state="error", message="Espace disque insuffisant (moins de 2 Go libres)")
+        return False
+    holds = policy_holds(policy)
+    save_status(state="checking", message="Préparation des mises à jour…")
+    conf, excluded, err = sync_temp_db()
+    if err:
+        save_status(state="error", message="Impossible de joindre les serveurs de mise à jour", error=err)
+        return False
+    updates = pending_updates(conf, holds)
+    flatpak = cfg.getboolean("flatpak") and shutil.which("flatpak")
+    if not updates and not flatpak:
+        save_status(state="idle", message="Votre système est à jour", updates=[], total_updates=0, security_updates=0)
+        return True
+
+    started = now()
+    snapshot = None
+    if updates:
+        save_status(state="installing", message="Création d'un point de restauration…")
+        snapshot = create_snapshot(cfg, f"IXIN Update — avant {len(updates)} mise(s) à jour")
+    before = installed_versions()
+    env = dict(os.environ, IXIN_UPDATE_IN_PROGRESS="1", LC_ALL="C")
+    ignore = [f"--ignore={h}" for h in holds]
+    ok, error = True, None
+    with ShutdownGuard():
+        if updates:
+            save_status(state="installing", message=f"Installation de {len(updates)} mise(s) à jour…")
+            log(f"Installation ({reason}) : {', '.join(u['name'] for u in updates[:40])}"
+                + (" …" if len(updates) > 40 else ""))
+            steps = [["pacman", "-Sy", "--noconfirm", "--config", conf, "--color", "never"]]
+            keyrings = [k for k in KEYRING_PKGS if any(u["name"] == k for u in updates)]
+            if keyrings:
+                steps.append(["pacman", "-S", "--noconfirm", "--needed", "--config", conf, "--color", "never"] + keyrings)
+            steps.append(["pacman", "-Su", "--noconfirm", "--config", conf, "--color", "never"] + ignore)
+            for cmd in steps:
+                rc, out = run_logged(cmd, verbose=verbose, env=env)
+                if rc != 0:
+                    ok = False
+                    errors = [l for l in out.splitlines() if l.startswith("error:")]
+                    error = "\n".join(errors[-6:]) or out.strip()[-600:]
+                    log(f"Échec de « {' '.join(cmd[:2])} » (code {rc})")
+                    break
+        if ok and flatpak:
+            save_status(state="installing", message="Mise à jour des applications Flatpak…")
+            rc, _ = run_logged(["flatpak", "update", "--system", "--noninteractive", "-y"], verbose=verbose)
+            if rc != 0:
+                log("Mise à jour Flatpak incomplète (ignorée)")
+
+    after = installed_versions()
+    changed = sorted(n for n, v in after.items() if before.get(n) != v)
+    reboot = reboot_needed(changed)
+    security = sum(1 for u in updates if u.get("security") and u["name"] in changed) if updates else 0
+    if updates or changed or not ok:
+        add_history({"date": iso(started), "result": "ok" if ok else "failed", "reason": reason,
+                     "count": len(changed), "security": security, "packages": changed[:60],
+                     "snapshot": snapshot, "error": error, "excluded_repos": sorted(excluded)})
+    st["last_apply_ts"] = now()
+    if ok:
+        st["last_success_ts"] = now()
+        st["pending_security"] = False
+        prev = load_status()
+        reboot_pkgs = sorted(set(reboot) | (set(prev.get("reboot_packages", []))
+                                            if prev.get("reboot_boot_id") == boot_id() else set()))
+        pacnew = len(list(Path("/etc").rglob("*.pacnew")))
+        msg = (f"{len(changed)} mise(s) à jour installée(s)" if changed else "Votre système est à jour")
+        if reboot_pkgs:
+            msg += " — redémarrez pour terminer"
+        save_status(state="idle", last_apply=iso(now()), last_result="ok", message=msg, updates=[], postponed=None,
+                    total_updates=0, security_updates=0, last_installed=changed[:60], last_security=security,
+                    reboot_required=bool(reboot_pkgs), reboot_packages=reboot_pkgs,
+                    reboot_boot_id=boot_id() if reboot_pkgs else None, pacnew=pacnew, error=None,
+                    last_snapshot=snapshot)
+        log(msg)
+    else:
+        save_status(state="error", last_apply=iso(now()), last_result="failed",
+                    message="L'installation des mises à jour a échoué — rien n'a été cassé, nouvel essai plus tard",
+                    error=error, last_snapshot=snapshot)
+    return ok
+
+
+# ───────────────────────────── reprise après interruption ─────────────────────────────
+
+def recover_interrupted(cfg):
+    """Le PC s'est éteint pendant une installation (coupure de courant, batterie vide…) :
+    on libère le verrou, on réinstalle les paquets de la transaction interrompue (fichiers
+    éventuellement incomplets) et on régénère les images de démarrage. Appelé verrou détenu."""
+    status = load_status()
+    state = status.get("state")
+    if state == "checking":
+        save_status(state="idle")
+        return
+    if state != "installing":
+        return
+    log("Installation précédente interrompue (arrêt brutal ?) : réparation en cours")
+    save_status(message="Réparation après une installation interrompue…")
+    if PACMAN_LOCK.exists() and not pacman_busy_process():
+        PACMAN_LOCK.unlink(missing_ok=True)
+        log("Verrou pacman de l'installation interrompue supprimé")
+    installed = installed_versions()
+    pkgs = [u["name"] for u in status.get("updates", []) if u.get("name") in installed]
+    ok = True
+    env = dict(os.environ, IXIN_UPDATE_IN_PROGRESS="1", LC_ALL="C")
+    with ShutdownGuard():
+        if pkgs:
+            rc, _ = run_logged(["pacman", "-S", "--noconfirm", "--color", "never"] + pkgs, env=env)
+            ok = rc == 0
+        rc, _ = run_logged(["mkinitcpio", "-P"], env=env)
+        ok = ok and rc == 0
+    add_history({"date": iso(now()), "result": "repaired" if ok else "failed", "reason": "reprise après interruption",
+                 "count": len(pkgs), "security": 0, "packages": pkgs[:60], "snapshot": None,
+                 "error": None if ok else "réparation incomplète", "excluded_repos": []})
+    save_status(state="idle" if ok else "error",
+                message="Installation interrompue réparée" if ok else
+                "Réparation incomplète après une installation interrompue : relancez la mise à jour")
+    log("Réparation terminée" if ok else "Réparation incomplète")
+
+
+# ───────────────────────────── commandes ─────────────────────────────
+
+def cmd_status(args):
+    status = load_status()
+    if status.get("reboot_required") and status.get("reboot_boot_id") != boot_id():
+        status["reboot_required"] = False
+    if args.json:
+        print(json.dumps(status, indent=1, ensure_ascii=False))
+        return
+    cfg = load_config()
+    print(f"IXIN Update — mode : {MODE_LABELS.get(cfg.get('mode'))}")
+    print(f"État : {status.get('message', 'aucune vérification pour le moment')}")
+    if status.get("last_check"):
+        print(f"Dernière recherche : {status['last_check']}")
+    if status.get("last_apply"):
+        print(f"Dernière installation : {status['last_apply']} ({status.get('last_result')})")
+    for u in status.get("updates", []):
+        flag = "  [SÉCURITÉ]" if u.get("security") else ""
+        print(f"  • {u['name']} {u['old']} → {u['new']}{flag}")
+    if status.get("reboot_required"):
+        print("⚠ Redémarrage nécessaire : " + ", ".join(status.get("reboot_packages", [])))
+    notice = status.get("notice")
+    if notice:
+        print(f"Annonce IXIN : {notice.get('text')}")
+    if status.get("error"):
+        print(f"Erreur : {status['error']}")
+
+
+def cmd_check(args):
+    require_root()
+    with Lock():
+        cfg, st = load_config(), load_state()
+        recover_interrupted(cfg)
+        policy = refresh_policy(cfg, st)
+        publish_notice(policy)
+        do_check(cfg, policy, st, download=cfg.get("mode") == "auto")
+        save_state(st)
+
+
+def cmd_apply(args):
+    require_root()
+    with Lock(wait=True):
+        cfg, st = load_config(), load_state()
+        recover_interrupted(cfg)
+        policy = refresh_policy(cfg, st)
+        publish_notice(policy)
+        if not online():
+            save_status(state="idle", message="Hors ligne : impossible d'installer les mises à jour")
+            save_state(st)
+            return 1
+        urgent = policy_urgent(policy, st)
+        ok = do_apply(cfg, policy, st, reason=args.reason, verbose=args.verbose)
+        if ok and urgent:
+            st["urgent_done_serial"] = int(policy.get("serial", 0))
+        save_state(st)
+        return 0 if ok else 1
+
+
+def publish_notice(policy):
+    notice = (policy or {}).get("notice")
+    if notice and isinstance(notice, dict) and notice.get("text"):
+        save_status(notice={"text": str(notice["text"])[:500], "level": notice.get("level", "info"),
+                            "serial": policy.get("serial")})
+    else:
+        save_status(notice=None)
+
+
+def cmd_auto(args):
+    require_root()
+    if is_live():
+        return 0
+    with Lock():
+        cfg, st = load_config(), load_state()
+        recover_interrupted(cfg)
+        st.setdefault("installed_ts", now())
+        mode = cfg.get("mode")
+        if mode == "manual":
+            save_status(state="idle", message="Mode manuel : recherchez les mises à jour depuis le Centre IXIN")
+            save_state(st)
+            return 0
+        # Point de restauration initial (premier démarrage après l'installation)
+        if not st.get("initial_snapshot_done"):
+            if create_snapshot(cfg, "IXIN — Installation initiale") or not root_btrfs():
+                st["initial_snapshot_done"] = True
+
+        policy = refresh_policy(cfg, st)
+        publish_notice(policy)
+        urgent = policy_urgent(policy, st)
+        interval = cfg.getfloat("check_interval_hours") * 3600
+        due = urgent or st.get("pending_security") or now() - st.get("last_check_ts", 0) >= interval
+        if not due:
+            save_state(st)
+            return 0
+
+        result = do_check(cfg, policy, st, download=(mode == "auto"))
+        save_state(st)
+        if not result or not result["updates"] or mode != "auto":
+            return 0
+
+        security = result["security"] > 0
+        reasons = postpone_reasons(cfg, security or urgent)
+        if security or urgent:
+            if reasons:
+                save_status(message=f"Mise à jour de sécurité en attente : {', '.join(reasons)}",
+                            postponed=", ".join(reasons))
+                log(f"Mise à jour de sécurité reportée : {', '.join(reasons)}")
+                return 0
+            ok = do_apply(cfg, policy, st, reason="sécurité" if security else "urgente (IXIN)")
+            if ok and urgent:
+                st["urgent_done_serial"] = int(policy.get("serial", 0))
+            save_state(st)
+            return 0
+
+        window = cfg.getfloat("install_interval_hours") * 3600
+        if now() - st.get("last_apply_ts", 0) < window:
+            return 0
+        news = arch_news_blocking(cfg, policy, st)
+        if news:
+            save_status(message=f"Mises à jour en attente : annonce Arch Linux à vérifier ({news['title']})",
+                        arch_news=news, postponed="annonce Arch Linux à vérifier")
+            log(f"Mises à jour reportées (annonce Arch : {news['title']})")
+            return 0
+        save_status(arch_news=None)
+        if reasons:
+            save_status(message=f"{len(result['updates'])} mise(s) à jour en attente : {', '.join(reasons)}",
+                        postponed=", ".join(reasons))
+            log(f"Installation reportée : {', '.join(reasons)}")
+            return 0
+        do_apply(cfg, policy, st, reason="automatique")
+        save_state(st)
+    return 0
+
+
+def cmd_snapshot(args):
+    require_root()
+    if args.hook:
+        # Hook pacman : jamais bloquant, pas de doublon avec ixin-update, pas en live/chroot.
+        if os.environ.get("IXIN_UPDATE_IN_PROGRESS") or is_live() or in_chroot():
+            return 0
+        st = load_state()
+        if now() - st.get("last_hook_snapshot", 0) < 1800:
+            return 0
+        try:
+            if create_snapshot(load_config(), "IXIN — avant modification des paquets (pacman)"):
+                st["last_hook_snapshot"] = now()
+                save_state(st)
+        except Exception as e:  # noqa: BLE001 — ne jamais faire échouer pacman
+            print(f"ixin-update : point de restauration ignoré ({e})")
+        return 0
+    name = create_snapshot(load_config(), args.comment or "IXIN — point de restauration manuel")
+    print(name or "Point de restauration impossible (système non Btrfs ?)")
+    return 0 if name else 1
+
+
+def cmd_set_mode(args):
+    require_root()
+    cp = configparser.ConfigParser()
+    cp.read(ETC_CONF, encoding="utf-8")
+    if not cp.has_section("update"):
+        cp.add_section("update")
+    cp["update"]["mode"] = args.mode
+    ETC_CONF.parent.mkdir(parents=True, exist_ok=True)
+    with open(ETC_CONF, "w", encoding="utf-8") as f:
+        f.write("# Réglages locaux d'IXIN Update (valeurs par défaut : /usr/lib/ixin/update.conf)\n")
+        cp.write(f)
+    log(f"Mode de mise à jour : {args.mode}")
+    save_status(message=f"Mode de mise à jour : {MODE_LABELS[args.mode]}")
+    print(f"Mode de mise à jour : {MODE_LABELS[args.mode]}")
+
+
+def cmd_boot_check(args):
+    """Après restauration d'un point de restauration, /boot (partition EFI) peut contenir un noyau
+    plus récent que les modules du système restauré : on réinstalle le noyau correspondant."""
+    require_root()
+    if is_live():
+        return 0
+    running = os.uname().release
+    if Path(f"/usr/lib/modules/{running}").is_dir():
+        st = load_state()
+        if st.get("boot_repair_attempts"):
+            st["boot_repair_attempts"] = 0
+            save_state(st)
+        return 0
+    st = load_state()
+    bid = boot_id()
+    if st.get("boot_repair_boot_id") == bid or st.get("boot_repair_attempts", 0) >= 2:
+        log("Réparation du noyau déjà tentée : intervention manuelle nécessaire")
+        save_status(state="error", message="Le noyau ne correspond pas au système : réparation manuelle nécessaire")
+        return 1
+    repaired = False
+    for moddir in Path("/usr/lib/modules").iterdir():
+        pkgbase, vmlinuz = moddir / "pkgbase", moddir / "vmlinuz"
+        if pkgbase.exists() and vmlinuz.exists():
+            target = Path(f"/boot/vmlinuz-{pkgbase.read_text().strip()}")
+            shutil.copyfile(vmlinuz, target)
+            log(f"Noyau réinstallé après restauration : {target.name} ({moddir.name})")
+            repaired = True
+    if not repaired:
+        return 1
+    st["boot_repair_boot_id"] = bid
+    st["boot_repair_attempts"] = st.get("boot_repair_attempts", 0) + 1
+    save_state(st)
+    run(["mkinitcpio", "-P"], timeout=1800)
+    log("Redémarrage pour terminer la restauration")
+    run(["systemctl", "reboot"])
+    return 0
+
+
+def cmd_interactive(args):
+    if os.geteuid() != 0:
+        os.execvp("sudo", ["sudo", sys.argv[0], "interactive"])
+    with Lock(wait=True):
+        cfg, st = load_config(), load_state()
+        policy = refresh_policy(cfg, st)
+        publish_notice(policy)
+        print("Recherche des mises à jour…")
+        result = do_check(cfg, policy, st, download=False)
+        save_state(st)
+    args.json = False
+    cmd_status(args)
+    if not result or not result["updates"]:
+        return 0
+    answer = input("\nInstaller maintenant ? [O/n] ").strip().lower()
+    if answer not in ("", "o", "oui", "y", "yes"):
+        return 0
+    args.reason, args.verbose = "manuelle (terminal)", True
+    return cmd_apply(args)
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="ixin-update", description="Mises à jour d'IXIN OS")
+    sub = parser.add_subparsers(dest="cmd")
+    p = sub.add_parser("status", help="afficher l'état")
+    p.add_argument("--json", action="store_true")
+    p = sub.add_parser("check", help="rechercher les mises à jour")
+    p.add_argument("--force", action="store_true")
+    p = sub.add_parser("apply", help="installer les mises à jour maintenant")
+    p.add_argument("--reason", default="manuelle")
+    p.add_argument("--verbose", action="store_true")
+    sub.add_parser("auto", help="vérification automatique (timer)")
+    p = sub.add_parser("snapshot", help="créer un point de restauration")
+    p.add_argument("--hook", action="store_true")
+    p.add_argument("--comment")
+    p = sub.add_parser("set-mode", help="choisir le mode de mise à jour")
+    p.add_argument("mode", choices=MODES)
+    sub.add_parser("boot-check", help="vérifier le noyau au démarrage")
+    sub.add_parser("interactive", help="mise à jour interactive dans le terminal")
+    args = parser.parse_args()
+
+    if args.cmd in (None, "interactive"):
+        return cmd_interactive(args)
+    handlers = {"status": cmd_status, "check": cmd_check, "apply": cmd_apply, "auto": cmd_auto,
+                "snapshot": cmd_snapshot, "set-mode": cmd_set_mode, "boot-check": cmd_boot_check}
+    if args.cmd != "status":
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+    return handlers[args.cmd](args) or 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

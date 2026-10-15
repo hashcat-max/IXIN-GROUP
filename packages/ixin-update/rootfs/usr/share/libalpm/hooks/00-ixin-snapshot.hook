@@ -1,0 +1,12 @@
+# IXIN Update : point de restauration Btrfs (Timeshift) avant toute mise à jour ou
+# suppression de paquets, même lancée à la main (pacman, yay…). Jamais bloquant.
+[Trigger]
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Point de restauration IXIN (Timeshift)...
+When = PreTransaction
+Exec = /usr/bin/ixin-update snapshot --hook

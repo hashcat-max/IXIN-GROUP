@@ -19,6 +19,7 @@ aux jeux Steam / Windows**.
 | **Sécurité** | Pare-feu UFW (entrant bloqué), AppArmor, sysctl durcis, DNS chiffré (DNS-over-TLS Quad9), MAC Wi-Fi aléatoire, nom d'hôte non envoyé en DHCP, chiffrement de disque LUKS à l'installation, Firejail, OpenSnitch, USBGuard, ClamAV, rkhunter, Lynis, arch-audit. Commande `ixin-secure`. |
 | **Vie privée** | Navigateur Tor, Tor + torsocks, Signal, KeePassXC, VeraCrypt, GnuPG/Kleopatra, mat2 / Metadata Cleaner, BleachBit, WireGuard / OpenVPN. |
 | **Applications** | Firefox, Thunderbird, LibreOffice, VLC, mpv, OBS Studio, GIMP, Dolphin, Kate, Okular, Gwenview, Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs). |
+| **Mises à jour** | **IXIN Update** : mises à jour automatiques comme sous Windows — correctifs de sécurité installés dès leur publication (détection des CVE via le suivi de sécurité Arch), le reste une fois par jour en arrière-plan, point de restauration Btrfs avant chaque mise à jour, notifications KDE, report pendant les jeux / sur batterie. L'équipe IXIN peut **pousser** des mises à jour et correctifs urgents signés sur tous les PC (dépôt `[ixin]`). Voir [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md). |
 | **Installation** | Calamares : « À côté de Windows » (redimensionnement automatique), Btrfs avec sous-volumes `@ @home @cache @log`, chiffrement **LUKS2 (argon2id)** déverrouillé au démarrage sur l'écran IXIN, partition de démarrage EFI de 1 Go, GRUB avec détection de Windows (os-prober). |
 
 ## Obtenir l'ISO
@@ -74,8 +75,10 @@ raisonnables sans casser les jeux :
   MAC aléatoire, pas de service réseau exposé (pas de SSH), sudo avec mot de passe.
 * **À activer selon vos besoins** (Centre IXIN → Sécurité ou `ixin-secure …`) :
   OpenSnitch (pare-feu applicatif), USBGuard, service Tor.
-* **Bonnes pratiques** : cochez le chiffrement du disque à l'installation, mettez à jour souvent
-  (`ixin-update`, qui signale aussi les paquets vulnérables), utilisez KeePassXC et des mots de passe uniques.
+* **Mises à jour automatiques** (IXIN Update) : les failles corrigées par Arch Linux sont installées dès
+  leur publication, et l'équipe IXIN peut pousser ses propres correctifs signés.
+* **Bonnes pratiques** : cochez le chiffrement du disque à l'installation, laissez les mises à jour
+  en mode automatique, utilisez KeePassXC et des mots de passe uniques.
 * Non inclus volontairement : `mitigations=off` et autres réglages qui gagnent quelques % de FPS
   au prix de la sécurité.
 
@@ -85,7 +88,7 @@ raisonnables sans casser les jeux :
 |---|---|
 | `ixin-center` | Centre IXIN (interface graphique) |
 | `ixin-secure [status\|firewall-on\|opensnitch-on\|usbguard-on\|tor-on\|audit\|scan\|rootkit]` | État et réglages de sécurité |
-| `ixin-update` | Mise à jour système + Flatpak + firmwares + audit des vulnérabilités |
+| `ixin-update` | État et mise à jour (IXIN Update) — `status`, `check`, `apply`, `snapshot` |
 | `ixin-gaming <cmd>` | Lance un jeu avec GameMode + MangoHud (`--gamescope` en option) |
 | `ixin-install` | Lance l'installeur |
 
@@ -93,7 +96,10 @@ raisonnables sans casser les jeux :
 
 ```
 build.sh                      script de construction de l'ISO
-.github/workflows/            construction + publication automatiques
+.github/workflows/            construction de l'ISO + publication du dépôt de mises à jour [ixin]
+packages/                     paquets IXIN (ixin-tools, ixin-update, ixin-settings, ixin-artwork…)
+repo/policy.json              politique IXIN Update (urgent, blocages, annonces)
+tools/                        construction/signature des paquets, clé de signature, migration bêta
 iso/                          profil archiso
 ├── profiledef.sh             nom, étiquette, modes de démarrage
 ├── packages.x86_64           liste des paquets
@@ -101,9 +107,7 @@ iso/                          profil archiso
 ├── efiboot/ syslinux/ grub/  menus de démarrage UEFI / BIOS
 └── airootfs/                 fichiers du système
     ├── etc/calamares/        configuration de l'installeur
-    ├── etc/sysctl.d/         durcissement + performance
-    ├── usr/local/bin/        outils ixin-*
-    └── usr/share/            thème Plasma, couleurs, Plymouth, GRUB, SDDM, logos
+    └── usr/local/bin/        scripts du live (installation)
 ```
 
 Basé sur Arch Linux et archiso. Arch Linux est une marque de Levente Polyak et Judd Vinet ;

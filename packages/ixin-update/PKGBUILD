@@ -1,0 +1,18 @@
+# Maintainer: IXIN Group <https://getixin.com>
+# Version calculée automatiquement par tools/build-packages.sh (date du dernier commit du paquet).
+pkgname=ixin-update
+pkgver=0
+pkgrel=1
+pkgdesc="IXIN Update : mises à jour automatiques d'IXIN OS (sécurité prioritaire, points de restauration, notifications)"
+arch=('any')
+url="https://github.com/hashcat-max/IXIN-GROUP"
+license=('LicenseRef-IXIN')
+depends=('python' 'python-pyqt6' 'pacman' 'arch-audit' 'gnupg' 'systemd' 'polkit'
+         'libnotify' 'timeshift' 'btrfs-progs' 'kernel-modules-hook' 'ixin-keyring' 'ixin-mirrorlist')
+optdepends=('flatpak: mise à jour des applications Flatpak' 'networkmanager: détection des connexions limitées')
+install=ixin-update.install
+
+package() {
+  cp -a "$startdir/rootfs/." "$pkgdir/"
+  install -dm755 "$pkgdir/var/lib/ixin-update"
+}

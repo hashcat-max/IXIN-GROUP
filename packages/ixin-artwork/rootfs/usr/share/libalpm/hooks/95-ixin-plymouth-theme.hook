@@ -1,0 +1,9 @@
+[Trigger]
+Operation = Upgrade
+Type = Path
+Target = usr/share/plymouth/themes/ixin/*
+
+[Action]
+Description = Mise à jour de l'écran de démarrage IXIN (Plymouth)...
+When = PostTransaction
+Exec = /usr/lib/ixin/ixin-artwork-sync plymouth

@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""IXIN Update — icône de notification et alertes dans la session KDE.
+
+Surveille /var/lib/ixin-update/status.json (écrit par le service ixin-update) et
+prévient l'utilisateur : mises à jour installées, redémarrage nécessaire, mise à jour
+de sécurité en attente, erreur, annonce de l'équipe IXIN. L'icône n'est visible que
+lorsqu'il y a quelque chose à signaler (comme sous Windows).
+"""
+import hashlib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from PyQt6.QtCore import QFileSystemWatcher, QLockFile, QProcess, QTimer
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
+
+STATUS_DIR = Path("/var/lib/ixin-update")
+STATUS_FILE = STATUS_DIR / "status.json"
+CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "ixin" / "update-notifier.json"
+APP = "IXIN Update"
+
+
+def icon(*names):
+    for name in names:
+        ic = QIcon.fromTheme(name)
+        if not ic.isNull():
+            return ic
+    return QIcon("/usr/share/ixin/branding/ixin-logo-64.png")
+
+
+def boot_id():
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        return ""
+
+
+def digest(*parts):
+    return hashlib.sha1(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
+def detached(*cmd):
+    try:
+        subprocess.Popen(list(cmd), start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
+class Notifier:
+    def __init__(self, app):
+        self.app = app
+        self.seen = self.load_seen()
+        self.status = {}
+        self.procs = []
+
+        self.tray = QSystemTrayIcon(icon("ixin"))
+        self.tray.setToolTip(APP)
+        self.tray.activated.connect(self.on_activated)
+        menu = QMenu()
+        self.act_open = QAction("Ouvrir les mises à jour", menu, triggered=self.open_center)
+        self.act_check = QAction("Rechercher des mises à jour", menu, triggered=lambda: self.start_unit("check"))
+        self.act_apply = QAction("Installer maintenant", menu, triggered=lambda: self.start_unit("apply"))
+        self.act_reboot = QAction("Redémarrer maintenant", menu, triggered=self.reboot)
+        self.act_restore = QAction("Points de restauration…", menu,
+                                   triggered=lambda: detached("timeshift-launcher"))
+        for act in (self.act_open, self.act_check, self.act_apply, self.act_reboot):
+            menu.addAction(act)
+        menu.addSeparator()
+        menu.addAction(self.act_restore)
+        self.menu = menu
+        self.tray.setContextMenu(menu)
+
+        self.watcher = QFileSystemWatcher()
+        if STATUS_DIR.is_dir():
+            self.watcher.addPath(str(STATUS_DIR))
+        self.watcher.directoryChanged.connect(lambda _: self.refresh())
+        self.timer = QTimer(interval=60_000, timeout=self.refresh)
+        self.timer.start()
+        QTimer.singleShot(3000, self.refresh)
+
+    # ── mémoire des notifications déjà affichées ──
+    def load_seen(self):
+        try:
+            return json.loads(CACHE.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def mark(self, key, value):
+        self.seen[key] = value
+        try:
+            CACHE.parent.mkdir(parents=True, exist_ok=True)
+            CACHE.write_text(json.dumps(self.seen))
+        except OSError:
+            pass
+
+    def once(self, key, value):
+        """Vrai la première fois qu'une valeur est vue pour cette clé."""
+        if self.seen.get(key) == value:
+            return False
+        self.mark(key, value)
+        return True
+
+    # ── actions ──
+    def open_center(self):
+        detached("/usr/bin/ixin-center", "--tab", "updates")
+
+    def start_unit(self, what):
+        detached("systemctl", "start", "--no-block", f"ixin-update-{what}.service")
+
+    def reboot(self):
+        # Boîte de dialogue standard de Plasma (avec compte à rebours), sinon systemd.
+        r = subprocess.run(["dbus-send", "--session", "--type=method_call", "--dest=org.kde.LogoutPrompt",
+                            "/LogoutPrompt", "org.kde.LogoutPrompt.promptReboot"], capture_output=True)
+        if r.returncode != 0:
+            detached("systemctl", "reboot")
+
+    def on_activated(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self.open_center()
+
+    def notify(self, title, body, icon_name="ixin", urgency="normal", actions=None):
+        """Notification KDE (avec boutons) via notify-send ; la réponse est traitée sans bloquer."""
+        cmd = ["--app-name", APP, "--icon", icon_name, "--urgency", urgency]
+        for key, label in (actions or {}).items():
+            cmd.append(f"--action={key}={label}")
+        cmd += [title, body]
+        proc = QProcess()
+        proc.finished.connect(lambda *_: self.on_action(proc))
+        proc.start("notify-send", cmd)
+        self.procs.append(proc)
+
+    def on_action(self, proc):
+        key = bytes(proc.readAllStandardOutput()).decode().strip()
+        self.procs = [p for p in self.procs if p is not proc]
+        if key == "reboot":
+            self.reboot()
+        elif key == "install":
+            self.start_unit("apply")
+        elif key == "open":
+            self.open_center()
+
+    # ── logique principale ──
+    def refresh(self):
+        if not STATUS_DIR.is_dir():
+            return
+        if str(STATUS_DIR) not in self.watcher.directories():
+            self.watcher.addPath(str(STATUS_DIR))
+        try:
+            st = json.loads(STATUS_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        self.status = st
+        reboot = st.get("reboot_required") and st.get("reboot_boot_id") == boot_id()
+        state = st.get("state", "idle")
+        updates = st.get("updates") or []
+        security = st.get("security_updates", 0)
+        mode = st.get("mode", "auto")
+        message = st.get("message", "")
+
+        # 1. Dernière installation terminée
+        history = st.get("history") or []
+        if history:
+            last = history[0]
+            if self.once("history", last.get("date")) and self.seen.get("history_init"):
+                if last.get("result") == "ok" and last.get("count"):
+                    body = f"{last['count']} mise(s) à jour installée(s)"
+                    if last.get("security"):
+                        body += f", dont {last['security']} correctif(s) de sécurité"
+                    if reboot:
+                        body += ".\nRedémarrez pour terminer l'installation."
+                        self.mark("reboot", digest(boot_id(), st.get("reboot_packages")))
+                        self.notify("Mises à jour installées", body, "system-reboot", "normal",
+                                    {"reboot": "Redémarrer maintenant", "open": "Plus tard"})
+                    else:
+                        self.notify("Mises à jour installées", body + ".", "system-software-update")
+                elif last.get("result") == "failed":
+                    self.notify("Échec de la mise à jour",
+                                "Les mises à jour n'ont pas pu être installées. Votre système n'a pas été modifié ; "
+                                "un nouvel essai aura lieu automatiquement.", "dialog-warning", "normal",
+                                {"open": "Voir les détails"})
+            self.mark("history_init", True)
+
+        # 2. Redémarrage nécessaire (rappel une fois par session)
+        if reboot and self.once("reboot", digest(boot_id(), st.get("reboot_packages"))):
+            self.notify("Redémarrage nécessaire",
+                        "Des mises à jour importantes (" + ", ".join(st.get("reboot_packages", [])[:4]) +
+                        ") seront actives après le redémarrage.", "system-reboot", "normal",
+                        {"reboot": "Redémarrer maintenant", "open": "Plus tard"})
+
+        # 3. Mises à jour disponibles (mode « prévenir ») ou sécurité en attente
+        postponed = st.get("postponed")
+        if updates and (mode != "auto" or postponed):
+            key = digest([u["name"] + u["new"] for u in updates])
+            if self.once("pending", key):
+                title = "Mises à jour de sécurité disponibles" if security else "Mises à jour disponibles"
+                body = f"{len(updates)} mise(s) à jour" + (f", dont {security} de sécurité" if security else "")
+                if mode == "auto" and postponed:
+                    body = message
+                self.notify(title, body, "security-high" if security else "system-software-update",
+                            "critical" if security else "normal",
+                            {"install": "Installer maintenant", "open": "Détails"})
+
+        # 4. Erreur persistante
+        if state == "error" and self.once("error", digest(message, st.get("error"))):
+            self.notify("IXIN Update : problème", message, "dialog-warning", "normal", {"open": "Voir les détails"})
+
+        # 5. Annonce de l'équipe IXIN
+        notice = st.get("notice")
+        if notice and self.once("notice", notice.get("serial")):
+            urgency = "critical" if notice.get("level") == "critical" else "normal"
+            self.notify("Annonce IXIN", notice.get("text", ""), "ixin", urgency, {"open": "Ouvrir"})
+
+        # Icône : visible seulement s'il y a quelque chose à signaler
+        visible = True
+        if state == "installing":
+            self.tray.setIcon(icon("system-software-update", "update-high"))
+            self.tray.setToolTip(f"{APP}\n{message}")
+        elif reboot:
+            self.tray.setIcon(icon("system-reboot", "system-restart", "view-refresh"))
+            self.tray.setToolTip(f"{APP}\nRedémarrage nécessaire pour terminer les mises à jour")
+        elif state == "error":
+            self.tray.setIcon(icon("dialog-warning", "update-high"))
+            self.tray.setToolTip(f"{APP}\n{message}")
+        elif updates:
+            self.tray.setIcon(icon("update-high" if security else "update-low", "system-software-update"))
+            self.tray.setToolTip(f"{APP}\n{message}")
+        else:
+            visible = False
+        self.act_reboot.setVisible(bool(reboot))
+        self.act_apply.setEnabled(state not in ("installing", "checking"))
+        self.act_check.setEnabled(state not in ("installing", "checking"))
+        self.tray.setVisible(visible)
+
+
+def main():
+    if Path("/run/archiso").exists():
+        return 0          # système live : pas de mises à jour
+    runtime = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+    lock = QLockFile(os.path.join(runtime, "ixin-update-notifier.lock"))
+    if not lock.tryLock(100):
+        return 0          # déjà lancé
+    app = QApplication(sys.argv)
+    app.setApplicationName("ixin-update-notifier")
+    app.setDesktopFileName("ixin-update")
+    app.setQuitOnLastWindowClosed(False)
+    app.notifier = Notifier(app)   # garde une référence pendant toute la session
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

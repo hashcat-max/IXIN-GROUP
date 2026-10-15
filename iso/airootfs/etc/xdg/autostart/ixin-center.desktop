@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Centre IXIN (bienvenue)
-Exec=/usr/local/bin/ixin-center --welcome
-Icon=ixin
-X-KDE-autostart-phase=2
-OnlyShowIn=KDE;

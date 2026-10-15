@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>IXIN Group</vendor>
+  <vendor_url>https://getixin.com</vendor_url>
+  <icon_name>ixin</icon_name>
+  <action id="org.ixin.update.configure">
+    <description>Configure IXIN OS updates</description>
+    <description xml:lang="fr">Configurer les mises à jour d'IXIN OS</description>
+    <message>Authentication is required to change the update settings</message>
+    <message xml:lang="fr">Authentification requise pour modifier les réglages des mises à jour</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/ixin-update</annotate>
+  </action>
+</policyconfig>

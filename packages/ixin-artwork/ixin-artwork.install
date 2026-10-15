@@ -1,0 +1,11 @@
+post_install() {
+  # Thème Plymouth IXIN par défaut (sans reconstruire l'initramfs ici)
+  if [ -x usr/bin/plymouth-set-default-theme ]; then
+    current=$(usr/bin/plymouth-set-default-theme 2>/dev/null)
+    case "$current" in ""|bgrt|spinner|text|details) usr/bin/plymouth-set-default-theme ixin ;; esac
+  fi
+}
+
+post_upgrade() {
+  :
+}

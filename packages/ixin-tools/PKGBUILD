@@ -1,0 +1,20 @@
+# Maintainer: IXIN Group <https://getixin.com>
+# Version calculée automatiquement par tools/build-packages.sh (date du dernier commit du paquet).
+pkgname=ixin-tools
+pkgver=0
+pkgrel=1
+pkgdesc="Outils IXIN OS : Centre IXIN, ixin-secure, ixin-gaming"
+arch=('any')
+url="https://github.com/hashcat-max/IXIN-GROUP"
+license=('LicenseRef-IXIN')
+depends=('python' 'python-pyqt6' 'konsole' 'gamemode' 'pciutils')
+optdepends=('mangohud: overlay de performances (ixin-gaming)'
+            'gamescope: session de jeu Gamescope (ixin-gaming --gamescope)'
+            'ufw: pare-feu' 'opensnitch: pare-feu applicatif' 'usbguard: blocage des clés USB inconnues'
+            'tor: réseau Tor' 'lynis: audit de sécurité' 'clamav: antivirus' 'rkhunter: recherche de rootkits'
+            'arch-audit: paquets vulnérables')
+install=ixin-tools.install
+
+package() {
+  cp -a "$startdir/rootfs/." "$pkgdir/"
+}

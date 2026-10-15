@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=IXIN Update (notifications)
+Exec=/usr/lib/ixin-update/ixin-update-notifier
+Icon=ixin
+NoDisplay=true
+X-KDE-autostart-phase=2
+OnlyShowIn=KDE;

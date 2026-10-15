@@ -1,0 +1,15 @@
+post_install() {
+  # Activation (fonctionne aussi hors démarrage, par ex. lors de la construction de l'ISO)
+  usr/bin/systemctl enable ixin-update.timer ixin-update-bootcheck.service linux-modules-cleanup.service >/dev/null 2>&1 || true
+  if [ -d run/systemd/system ] && ! usr/bin/systemd-detect-virt --chroot >/dev/null 2>&1; then
+    usr/bin/systemctl start ixin-update.timer >/dev/null 2>&1 || true
+  fi
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  usr/bin/systemctl disable --now ixin-update.timer ixin-update-bootcheck.service >/dev/null 2>&1 || true
+}

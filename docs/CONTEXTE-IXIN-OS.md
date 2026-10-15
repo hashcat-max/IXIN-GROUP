@@ -99,6 +99,16 @@ An in-house graphical application that opens on first login. 4 tabs:
 - **Honesty**: no system is "100% secure". IXIN OS applies reasonable defense in depth without breaking games.
   Performance tweaks that weaken security (e.g. `mitigations=off`) are deliberately left out.
 
+### Automatic updates: IXIN Update (Windows-style)
+- **Automatic security fixes**: as soon as Arch Linux publishes a fix for a known flaw (CVE), it is installed (detected via the Arch security tracker).
+- Other updates: once a day in the background. Choice of mode: **Automatique** (default) / **Me prévenir seulement** / **Manuel**.
+- **Restore point** (Btrfs snapshot via Timeshift) before every update: possible rollback in a few clicks.
+- **Smart**: no non-urgent updates during a game, on battery or on a metered connection; shutdown is delayed until an installation finishes.
+- **Notifications** (taskbar icon): updates installed, restart needed, IXIN announcements.
+- **Push by the IXIN team**: the team can publish updates, **urgent fixes** (installed within the hour),
+  block a faulty update, or send a message to all PCs — all **cryptographically signed** (no third party can impersonate IXIN).
+- "Mises à jour" tab in the IXIN Center (status, security fixes with their CVEs, history, mode, restore points).
+
 ### Privacy and tools
 Tor Browser, Tor + torsocks, Signal, KeePassXC, VeraCrypt, GnuPG + Kleopatra, mat2 / Metadata Cleaner,
 BleachBit, WireGuard / OpenVPN (NetworkManager integration).
@@ -139,7 +149,7 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
 |---|---|
 | `ixin-center` | IXIN Center (graphical interface) |
 | `ixin-secure [status\|firewall-on\|opensnitch-on\|usbguard-on\|tor-on\|audit\|scan [folder]\|rootkit]` | Security status and settings |
-| `ixin-update` | Full update + vulnerability audit |
+| `ixin-update` | Updates (IXIN Update): `status`, `check`, `apply`, `snapshot` |
 | `ixin-gaming <cmd>` / `ixin-gaming --gamescope <cmd>` | Launch with GameMode + MangoHud (+ Gamescope) |
 | `ixin-install` | Launch the installer (live mode) |
 
@@ -178,13 +188,16 @@ Spectacle, Discover + Flathub, Timeshift + Snapper (Btrfs snapshots), KDE Connec
 - ⚠️ The **first published release (`build-2026.10.15-1`)** predates the GRUB fix: an install from it
   may fail to boot. Use the **next** build (`build-2026.10.15-2` or later).
 - Not tested on real hardware yet (VM only): label it **"Beta"** on the site.
+- IXIN Update tested in a VM: automatic search and install, restore point, urgent IXIN push received automatically,
+  forged policy / replayed policy / tampered repo database all rejected.
 - Ideas for later versions: Secure Boot signing, an optional "macOS-style" layout (dock), an optional security toolbox,
   a Windows helper that prepares the USB stick, a dedicated package repository, translations.
 
 ## 10. Suggested structure for os.ixin.online
 
 1. **Home**: hero with the shield + "IXIN OS", tagline, big "Télécharger" button (version, size), desktop screenshot.
-2. **Features**: 4 sections. **Sécurité** (firewall, AppArmor, LUKS2, encrypted DNS, MAC), **Jeux** (Steam / Proton, Heroic, Lutris…),
+2. **Features**: 5 sections. **Sécurité** (firewall, AppArmor, LUKS2, encrypted DNS, MAC), **Mises à jour automatiques**
+   (IXIN Update: security fixes as soon as they're published, restore points, IXIN push), **Jeux** (Steam / Proton, Heroic, Lutris…),
    **Vie privée** (Tor, Signal, KeePassXC, VeraCrypt…), **Simplicité** (Windows-style desktop, IXIN Center, graphical installer).
 3. **Download**: link(s), SHA-256, requirements, how to write the USB stick, "Beta" notice.
 4. **Documentation**: installation, dual boot with Windows, first steps, IXIN commands, gaming (Proton, anti-cheat), security, FAQ, troubleshooting (black screen → compatibility mode, Secure Boot, BitLocker).

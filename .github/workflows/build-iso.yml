@@ -7,6 +7,10 @@ on:
         description: "Publier l'ISO dans une Release GitHub"
         type: boolean
         default: true
+      allow_unsigned:
+        description: "Test uniquement : construire sans clé de signature (IXIN Update n'acceptera pas les mises à jour IXIN)"
+        type: boolean
+        default: false
   push:
     tags: [ "v*" ]
 
@@ -19,6 +23,8 @@ jobs:
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # versions des paquets IXIN calculées depuis l'historique git
 
       - name: Libérer de l'espace disque
         run: |
@@ -28,10 +34,19 @@ jobs:
           df -h / /mnt
 
       - name: Construire l'ISO dans un conteneur Arch Linux
+        env:
+          IXIN_SIGNING_KEY: ${{ secrets.IXIN_SIGNING_KEY }}
+          IXIN_SIGNING_KEY_PASSPHRASE: ${{ secrets.IXIN_SIGNING_KEY_PASSPHRASE }}
+          IXIN_ALLOW_UNSIGNED: ${{ inputs.allow_unsigned && '1' || '0' }}
         run: |
+          if [ -z "$IXIN_SIGNING_KEY" ] && [ "$IXIN_ALLOW_UNSIGNED" != 1 ]; then
+            echo "::error::Secret IXIN_SIGNING_KEY manquant — voir docs/MISES-A-JOUR.md, « Créer la clé de signature »"
+            exit 1
+          fi
           docker run --rm --privileged \
             -v "$GITHUB_WORKSPACE":/src -v /mnt/ixin:/mnt/ixin \
             -e BUILD_DIR=/mnt/ixin/build -e OUT_DIR=/mnt/ixin/out \
+            -e IXIN_SIGNING_KEY -e IXIN_SIGNING_KEY_PASSPHRASE -e IXIN_ALLOW_UNSIGNED \
             archlinux:latest bash -c '
               set -e
               sed -i "s/^#ParallelDownloads.*/ParallelDownloads = 10/" /etc/pacman.conf
@@ -74,6 +89,9 @@ jobs:
           cmd /c copy /b ${ISO}.part00+${ISO}.part01+${ISO}.part02 ${ISO}
           \`\`\`
           (ajoutez les morceaux suivants s'il y en a plus), puis gravez l'ISO sur une clé USB avec Rufus (mode GPT/UEFI) ou Ventoy.
+
+          Une fois installé, IXIN OS se met à jour tout seul (IXIN Update) : correctifs de sécurité
+          immédiatement, point de restauration avant chaque mise à jour.
           NOTES
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "IXIN OS $TAG" --notes-file "$RUNNER_TEMP/notes.md" \
             "$ISO".part* "$ISO.sha256"

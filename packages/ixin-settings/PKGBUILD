@@ -1,0 +1,17 @@
+# Maintainer: IXIN Group <https://getixin.com>
+# Version calculée automatiquement par tools/build-packages.sh (date du dernier commit du paquet).
+pkgname=ixin-settings
+pkgver=0
+pkgrel=1
+pkgdesc="Réglages d'IXIN OS : durcissement du noyau, DNS chiffré, vie privée réseau, performances, bureau"
+arch=('any')
+url="https://github.com/hashcat-max/IXIN-GROUP"
+license=('LicenseRef-IXIN')
+depends=('bash')
+install=ixin-settings.install
+
+package() {
+  # Les réglages système sont installés dans les répertoires « fournisseur » (/usr/lib/…) :
+  # ils sont mis à jour automatiquement, et un fichier du même nom dans /etc reste prioritaire.
+  cp -a "$startdir/rootfs/." "$pkgdir/"
+}

@@ -1,0 +1,19 @@
+[Unit]
+Description=IXIN Update — recherche et installation automatiques des mises à jour
+Documentation=https://github.com/hashcat-max/IXIN-GROUP/blob/HEAD/docs/MISES-A-JOUR.md
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/run/archiso
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ixin-update auto
+# Basse priorité : ne pas gêner l'utilisateur (ni les jeux)
+Nice=15
+IOSchedulingClass=idle
+CPUSchedulingPolicy=batch
+# Ne jamais interrompre une transaction pacman : seul le processus principal reçoit
+# l'arrêt (il l'ignore pendant l'installation) et l'arrêt est retardé si besoin.
+KillMode=process
+TimeoutStartSec=4h
+TimeoutStopSec=30min

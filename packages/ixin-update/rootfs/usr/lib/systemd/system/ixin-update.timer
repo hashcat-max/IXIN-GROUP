@@ -1,0 +1,14 @@
+[Unit]
+Description=IXIN Update — vérification régulière des mises à jour
+ConditionPathExists=!/run/archiso
+
+[Timer]
+# 10 minutes après le démarrage, puis toutes les heures (la politique IXIN est
+# consultée à chaque fois ; la recherche complète a lieu toutes les 4 h par défaut).
+OnBootSec=10min
+OnUnitInactiveSec=1h
+RandomizedDelaySec=5min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

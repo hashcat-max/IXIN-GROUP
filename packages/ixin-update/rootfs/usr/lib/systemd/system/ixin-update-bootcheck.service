@@ -1,0 +1,12 @@
+[Unit]
+Description=IXIN Update — vérification du noyau après une restauration du système
+After=local-fs.target
+Before=display-manager.service
+ConditionPathExists=!/run/archiso
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ixin-update boot-check
+
+[Install]
+WantedBy=multi-user.target

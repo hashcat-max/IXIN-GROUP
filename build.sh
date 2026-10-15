@@ -3,6 +3,10 @@
 #  IXIN OS — construction de l'image ISO
 #  À lancer en root sur Arch Linux (ou dans un conteneur archlinux --privileged)
 #      sudo ./build.sh            → out/ixin-os-AAAA.MM.JJ-x86_64.iso
+#
+#  Les paquets IXIN (packages/*) sont signés avec la clé de l'équipe IXIN :
+#      IXIN_SIGNING_KEY="$(cat cle-privee.asc)" sudo -E ./build.sh
+#  Sans clé (tests locaux uniquement) : IXIN_ALLOW_UNSIGNED=1 sudo -E ./build.sh
 # ═══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -48,7 +52,12 @@ for pkg in "${AUR_PKGS[@]}"; do
     (cd "$BUILD/aur/$pkg" && sudo -u ixinbuild makepkg -s --noconfirm --needed)
     find "$BUILD/aur/$pkg" -maxdepth 1 -name "$pkg-[0-9]*.pkg.tar.zst" -exec cp {} "$REPO/" \;
 done
-repo-add -q -n "$REPO/ixin-local.db.tar.gz" "$REPO"/*.pkg.tar.zst
+
+msg "Paquets IXIN (dépôt [ixin] signé)"
+"$ROOT/tools/build-packages.sh" "$BUILD/ixin-repo"
+rm -f "$REPO"/ixin-*.pkg.tar.zst "$REPO"/ixin-local.*
+cp "$BUILD/ixin-repo"/ixin-*.pkg.tar.zst "$REPO/"
+repo-add -q "$REPO/ixin-local.db.tar.gz" "$REPO"/*.pkg.tar.zst
 
 msg "Préparation du profil"
 WORKPROFILE="$BUILD/profile"

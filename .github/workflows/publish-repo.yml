@@ -1,0 +1,103 @@
+name: Publier les mises à jour IXIN
+
+# Construit, signe et publie le dépôt [ixin] (paquets IXIN + politique IXIN Update).
+# Tous les PC IXIN OS le consultent automatiquement : une modification fusionnée dans
+# packages/ ou repo/policy.json arrive chez les utilisateurs en quelques heures
+# (dans l'heure si la politique est marquée « urgent »).
+
+on:
+  push:
+    paths:
+      - "packages/**"
+      - "repo/policy.json"
+      - "tools/build-packages.sh"
+  workflow_dispatch:
+  schedule:
+    # Chaque lundi : nouvelle signature de la politique (valable 14 jours)
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-repo
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Seule la branche principale publie vers les PC des utilisateurs.
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # la version de chaque paquet vient de l'historique git
+
+      - name: Vérifier la clé de signature
+        id: key
+        env:
+          IXIN_SIGNING_KEY: ${{ secrets.IXIN_SIGNING_KEY }}
+        run: |
+          if [ -z "$IXIN_SIGNING_KEY" ]; then
+            msg="Secret IXIN_SIGNING_KEY manquant : rien n'est publié — voir docs/MISES-A-JOUR.md, « Créer la clé de signature »"
+            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then echo "::error::$msg"; exit 1; fi
+            echo "::warning::$msg"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Récupérer les paquets déjà publiés (versions inchangées réutilisées telles quelles)
+        if: steps.key.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p prev
+          if gh release view repo --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download repo --repo "$GITHUB_REPOSITORY" --dir prev \
+              --pattern '*.pkg.tar.zst' --pattern '*.pkg.tar.zst.sig' || true
+          fi
+          ls -1 prev
+
+      - name: Construire et signer (conteneur Arch Linux)
+        if: steps.key.outputs.skip != 'true'
+        env:
+          IXIN_SIGNING_KEY: ${{ secrets.IXIN_SIGNING_KEY }}
+          IXIN_SIGNING_KEY_PASSPHRASE: ${{ secrets.IXIN_SIGNING_KEY_PASSPHRASE }}
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/src \
+            -e IXIN_SIGNING_KEY -e IXIN_SIGNING_KEY_PASSPHRASE -e IXIN_REUSE_DIR=/src/prev \
+            archlinux:latest bash -c '
+              set -e
+              pacman-key --init >/dev/null && pacman-key --populate archlinux >/dev/null
+              pacman -Syu --noconfirm --needed base-devel git sudo >/dev/null
+              cd /src && tools/build-packages.sh /src/out-repo'
+          sudo chown -R "$USER" out-repo prev
+          ls -l out-repo
+
+      - name: Publier sur la release « repo »
+        if: steps.key.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd out-repo
+          if ! gh release view repo --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create repo --repo "$GITHUB_REPOSITORY" --prerelease \
+              --title "Dépôt de mises à jour IXIN OS (usage automatique)" \
+              --notes "Dépôt pacman [ixin] signé, consulté automatiquement par IXIN Update sur chaque PC IXIN OS. Pour installer IXIN OS, téléchargez l'ISO dans les autres versions."
+          fi
+          # 1) les paquets d'abord, 2) puis la base et la politique : un PC ne voit jamais
+          #    une base qui référence un paquet pas encore en ligne.
+          gh release upload repo --repo "$GITHUB_REPOSITORY" --clobber ./*.pkg.tar.zst ./*.pkg.tar.zst.sig
+          gh release upload repo --repo "$GITHUB_REPOSITORY" --clobber \
+            ./ixin.db ./ixin.db.sig ./ixin.db.tar.gz ./ixin.db.tar.gz.sig \
+            ./ixin.files ./ixin.files.sig ./ixin.files.tar.gz ./ixin.files.tar.gz.sig \
+            ./policy.json ./policy.json.sig
+          # 3) suppression des anciennes versions qui ne sont plus référencées
+          keep="$(ls -1)"
+          gh release view repo --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+            while read -r asset; do
+              grep -qxF "$asset" <<<"$keep" || gh release delete-asset repo "$asset" --repo "$GITHUB_REPOSITORY" --yes
+            done
+          echo "### Dépôt [ixin] publié" >> "$GITHUB_STEP_SUMMARY"
+          ls -1 *.pkg.tar.zst | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY"
+          python3 -c "import json;p=json.load(open('policy.json'));print(f\"- politique : serial {p['serial']}, urgent={p['urgent']}, hold={p['hold']}\")" >> "$GITHUB_STEP_SUMMARY"
