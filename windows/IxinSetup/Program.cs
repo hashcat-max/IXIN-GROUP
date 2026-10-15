@@ -26,8 +26,10 @@ namespace IxinSetup
                     case "--facts":
                         Console.WriteLine(Facts.Collect("C").Describe());
                         return 0;
+                    case "--screenshots":
+                        return Screenshots.Run(args.Length > 1 ? args[1] : null);
                     default:
-                        Console.WriteLine("Options : --version, --facts, --self-test [dossier], --self-test-boot-entry");
+                        Console.WriteLine("Options : --version, --facts, --self-test [dossier], --self-test-boot-entry, --screenshots [dossier]");
                         return 2;
                 }
             }

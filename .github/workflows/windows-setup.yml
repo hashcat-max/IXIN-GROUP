@@ -72,7 +72,21 @@ jobs:
         run: |
           $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
           Start-Process -FilePath $exe -ArgumentList "--facts" -Wait -NoNewWindow
+      - name: Captures d'écran (données d'exemple, pour le site et la documentation)
+        continue-on-error: true
+        shell: powershell
+        run: |
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--screenshots", "$env:RUNNER_TEMP\captures" -Wait -PassThru -NoNewWindow
+          Get-ChildItem "$env:RUNNER_TEMP\captures" | Format-Table Name, Length
+          if ($p.ExitCode -ne 0) { throw "Captures d'écran : échec (code $($p.ExitCode))" }
       - uses: actions/upload-artifact@v4
         with:
           name: ixin-os-setup
           path: windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ixin-os-setup-captures
+          path: ${{ runner.temp }}/captures
+          if-no-files-found: ignore

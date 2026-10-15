@@ -34,7 +34,7 @@ namespace IxinSetup
         private bool keySaved;
         private CancellationTokenSource running;
 
-        public MainForm()
+        public MainForm(bool analyse = true)
         {
             Text = "IXIN OS Setup";
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -78,7 +78,7 @@ namespace IxinSetup
             Controls.Add(line);
             Controls.Add(header);
 
-            Shown += async (s, e) => await Analyse();
+            if (analyse) Shown += async (s, e) => await Analyse();
             FormClosing += (s, e) =>
             {
                 if (running == null) return;
@@ -311,7 +311,7 @@ namespace IxinSetup
         private async void ShowBitLocker()
         {
             ShowPage(Busy("Clé de récupération BitLocker", "Lecture de vos clés de récupération…"));
-            System.Collections.Generic.List<RecoveryKey> keys;
+            List<RecoveryKey> keys;
             try
             {
                 keys = await Task.Run(() => BitLocker.RecoveryKeys(facts.DriveLetter));
@@ -321,7 +321,11 @@ namespace IxinSetup
                 ShowError("Lecture de la clé de récupération BitLocker impossible : " + ex.Message);
                 return;
             }
+            ShowBitLockerKeys(keys);
+        }
 
+        private void ShowBitLockerKeys(List<RecoveryKey> keys)
+        {
             var col = Theme.Column();
             col.Controls.Add(Theme.Label("Votre clé de récupération BitLocker", Theme.Title));
             col.Controls.Add(Theme.Label("Windows est chiffré par BitLocker. Après les changements du menu de démarrage, Windows peut " +
@@ -376,7 +380,7 @@ namespace IxinSetup
             ShowPage(col, next, Action("Retour", ShowOptions));
         }
 
-        private void SaveKeys(System.Collections.Generic.List<RecoveryKey> keys)
+        private void SaveKeys(List<RecoveryKey> keys)
         {
             using (var dlg = new SaveFileDialog { FileName = "Cle-de-recuperation-BitLocker.txt", Filter = "Texte (*.txt)|*.txt" })
             {
@@ -417,13 +421,23 @@ namespace IxinSetup
 
         // ── 5. préparation ───────────────────────────────────────────────────
 
-        private async Task RunPrepare()
+        private sealed class PrepareView
+        {
+            public Label Step, Detail;
+            public ProgressBar Bar;
+            public TextBox Log;
+        }
+
+        private PrepareView ShowPrepareView(Action onCancel)
         {
             var col = Theme.Column();
-            var stepLabel = Theme.Label("Démarrage…", Theme.Subtitle);
-            var bar = new ProgressBar { Width = 660, Height = 12, Maximum = 1000, Style = ProgressBarStyle.Continuous };
-            var detail = Theme.Label("", Theme.Small, Theme.Muted);
-            var logBox = new TextBox
+            var v = new PrepareView
+            {
+                Step = Theme.Label("Démarrage…", Theme.Subtitle),
+                Bar = new ProgressBar { Width = 660, Height = 12, Maximum = 1000, Style = ProgressBarStyle.Continuous },
+                Detail = Theme.Label("", Theme.Small, Theme.Muted),
+            };
+            v.Log = new TextBox
             {
                 Multiline = true,
                 ReadOnly = true,
@@ -438,17 +452,26 @@ namespace IxinSetup
             col.Controls.Add(Theme.Label("Préparation de l'installation", Theme.Title));
             col.Controls.Add(Theme.Label("Si Windows propose de « formater » un nouveau disque pendant la préparation, cliquez sur Annuler " +
                                          "dans cette fenêtre : IXIN OS Setup s'en occupe.", Theme.Small, Theme.Warning));
-            col.Controls.Add(stepLabel);
-            col.Controls.Add(bar);
-            col.Controls.Add(detail);
-            col.Controls.Add(logBox);
+            col.Controls.Add(v.Step);
+            col.Controls.Add(v.Bar);
+            col.Controls.Add(v.Detail);
+            col.Controls.Add(v.Log);
+            ShowPage(col, Action("Annuler", onCancel));
+            return v;
+        }
+
+        private async Task RunPrepare()
+        {
             running = new CancellationTokenSource();
-            var cancel = Action("Annuler", () =>
+            PrepareView view = null;
+            view = ShowPrepareView(() =>
             {
                 running?.Cancel();
-                stepLabel.Text = "Annulation en cours…";
+                view.Step.Text = "Annulation en cours…";
             });
-            ShowPage(col, cancel);
+            Label stepLabel = view.Step, detail = view.Detail;
+            ProgressBar bar = view.Bar;
+            TextBox logBox = view.Log;
 
             var step = new Progress<string>(s =>
             {
@@ -594,6 +617,11 @@ namespace IxinSetup
                 return;
             }
 
+            ShowPrepared();
+        }
+
+        private void ShowPrepared()
+        {
             var col = Theme.Column();
             col.Controls.Add(Theme.Label("L'installation d'IXIN OS est prête", Theme.Title, Theme.Accent));
             col.Controls.Add(Theme.Label($"Préparée le {state.Created.Replace('T', ' ')} — {Facts.Gb(state.IxinSize)} libres pour IXIN OS."));
@@ -649,6 +677,53 @@ namespace IxinSetup
             {
                 Log.Error(ex.ToString());
                 ShowError(ex.Message);
+            }
+        }
+
+        // ── captures d'écran (données d'exemple, rien n'est lu ni modifié sur le PC) ──
+
+        internal void Demo(string page, Facts sample, SetupState sampleState = null,
+                           List<string> sampleIxinEntries = null, List<RecoveryKey> sampleKeys = null)
+        {
+            facts = sample;
+            state = sampleState;
+            ixinEntries = sampleIxinEntries ?? new List<string>();
+            switch (page)
+            {
+                case "analyse":
+                    ShowPage(Busy("Analyse du PC…", "Lecture du disque de Windows, de BitLocker et de Secure Boot (jusqu'à une minute)."));
+                    break;
+                case "verification":
+                    ShowChecks();
+                    break;
+                case "espace":
+                    ShowOptions();
+                    break;
+                case "bitlocker":
+                    ShowBitLockerKeys(sampleKeys ?? new List<RecoveryKey>());
+                    break;
+                case "confirmation":
+                    ShowConfirm();
+                    break;
+                case "preparation":
+                    var v = ShowPrepareView(() => { });
+                    v.Step.Text = "Téléchargement d'IXIN OS (build-2026.10.15-3, 4,7 Go)…";
+                    v.Bar.Value = 430;
+                    v.Detail.Text = "Téléchargement : 2 Go sur 4,7 Go — 24,6 Mo/s — encore environ 2 min";
+                    v.Log.Text = "21:30:02  Recherche de la dernière version d'IXIN OS…" + Environment.NewLine +
+                                 "21:30:03  Téléchargement d'IXIN OS (build-2026.10.15-3, 4,7 Go)…" + Environment.NewLine;
+                    break;
+                case "terminee":
+                    ShowDone();
+                    break;
+                case "prete":
+                    ShowPrepared();
+                    break;
+                case "installee":
+                    ShowInstalled(false, 6 * Plan.GiB);
+                    break;
+                default:
+                    throw new ArgumentException("page inconnue : " + page);
             }
         }
 
