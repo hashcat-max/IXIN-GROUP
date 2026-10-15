@@ -2,7 +2,8 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  Crée LA clé de signature des mises à jour IXIN OS (à faire une seule fois).
 #
-#    tools/create-signing-key.sh            (Linux, macOS, WSL ou IXIN OS)
+#    tools/create-signing-key.sh     (Linux, macOS, IXIN OS, ou sous Windows :
+#                                     « Git Bash » installé avec Git for Windows)
 #
 #  Produit trois fichiers dans le dossier courant :
 #    ixin-signing-key-PRIVEE.asc      → à coller dans le secret GitHub IXIN_SIGNING_KEY,
@@ -22,8 +23,9 @@ umask 077
 
 # Pas d'expiration : une clé expirée bloquerait les mises à jour de tous les PC.
 # En cas de compromission, on la révoque (certificat ci-dessous) et on la remplace.
-gpg --batch --quiet --passphrase '' --quick-gen-key "IXIN OS Updates (équipe IXIN)" ed25519 sign never
-FPR="$(gpg --list-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')"
+gpg --batch --quiet --passphrase '' --quick-gen-key "IXIN OS Updates (équipe IXIN)" ed25519 sign never \
+    2> "$GNUPGHOME/gen.log" || { cat "$GNUPGHOME/gen.log" >&2; exit 1; }
+FPR="$(gpg --list-keys --with-colons 2>/dev/null | awk -F: '/^fpr/ {print $10; exit}')"
 
 gpg --armor --export-secret-keys "$FPR" > "$NAME-PRIVEE.asc"
 gpg --armor --export "$FPR" > "$NAME-publique.asc"

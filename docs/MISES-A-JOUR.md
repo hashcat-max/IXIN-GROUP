@@ -95,13 +95,14 @@ le dépôt `[ixin]` est placé avant `[core]`, il est donc prioritaire. À rése
 
 Sans cette clé, **aucune** mise à jour IXIN n'est acceptée par les PC (c'est voulu).
 
-1. Sur un ordinateur de confiance (IXIN OS, Linux, macOS ou WSL) :
+1. Sur un ordinateur de confiance : IXIN OS, Linux, macOS, ou Windows avec **Git Bash**
+   (installé avec [Git for Windows](https://git-scm.com/download/win)) :
    ```bash
    git clone https://github.com/hashcat-max/IXIN-GROUP && cd IXIN-GROUP
    tools/create-signing-key.sh
    ```
-   (Sous Windows sans WSL : Kleopatra/Gpg4win → *Nouvelle paire de clés* OpenPGP, puis
-   *Exporter les clés secrètes*.)
+   (Autre possibilité sous Windows : Kleopatra/Gpg4win → *Nouvelle paire de clés* OpenPGP,
+   **sans date d'expiration**, puis *Exporter les clés secrètes*.)
 2. GitHub → *Settings → Secrets and variables → Actions → New repository secret* :
    nom **`IXIN_SIGNING_KEY`**, valeur = contenu complet de `ixin-signing-key-PRIVEE.asc`.
    (Si la clé a une phrase de passe : second secret `IXIN_SIGNING_KEY_PASSPHRASE`.)
@@ -119,6 +120,11 @@ Sans cette clé, **aucune** mise à jour IXIN n'est acceptée par les PC (c'est 
 
 En cas de **vol** de la clé : faire immédiatement les étapes 1 à 3 et prévenir les utilisateurs
 (la clé volée reste dangereuse tant que les PC n'ont pas reçu la révocation).
+
+**Bon à savoir** : GitHub met en pause les tâches planifiées d'un dépôt resté 60 jours sans
+activité. Si l'action « Publier les mises à jour IXIN » est en pause (onglet *Actions*), la
+réactiver : sinon la politique n'est plus re-signée et expire au bout de 14 jours (les
+mises à jour continuent, mais sans blocages ni messages IXIN).
 
 ---
 
