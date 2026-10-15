@@ -137,6 +137,26 @@ namespace IxinSetup
                 if (id != null) BootEntry.Delete(id);
             }
             Expect(BootEntry.Find().Count == 0, "entrée de démarrage supprimée");
+
+            // IXIN OS installé : son entrée est retrouvée et peut être remise en tête de l'ordre de démarrage
+            string ixin = null;
+            try
+            {
+                ixin = BootEntry.Create("IXIN (test)", BootEntry.IxinLoaderPath);
+                Expect(BootEntry.FindIxin().Contains(ixin), "entrée d'IXIN OS installé retrouvée");
+                Expect(!string.Equals(BootEntry.FirstInBootOrder(), ixin, StringComparison.OrdinalIgnoreCase), "entrée d'IXIN OS ajoutée en fin de liste");
+                BootEntry.PutFirst(ixin);
+                Expect(string.Equals(BootEntry.FirstInBootOrder(), ixin, StringComparison.OrdinalIgnoreCase), "menu IXIN remis en premier au démarrage");
+            }
+            catch (Exception ex)
+            {
+                Expect(false, "entrée d'IXIN OS installé : " + ex.Message);
+            }
+            finally
+            {
+                if (ixin != null) BootEntry.Delete(ixin);
+            }
+            Expect(BootEntry.FindIxin().Count == 0, "entrée d'IXIN OS de test supprimée");
             Console.WriteLine(failures == 0 ? "TEST DE L'ENTRÉE DE DÉMARRAGE RÉUSSI" : $"{failures} échec(s)");
             return failures == 0 ? 0 : 1;
         }
@@ -153,6 +173,7 @@ namespace IxinSetup
                 "path                    \\EFI\\IXIN-SETUP\\grubx64.efi\r\ndescription             IXIN OS Setup\r\n";
             var ids = BootEntry.ParseEntries(bcdFr);
             Expect(ids.Count == 1 && ids[0] == "{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}", "lecture de la sortie de bcdedit");
+            Expect(BootEntry.ParseEntries(bcdFr, BootEntry.IxinLoaderPath).Count == 0, "IXIN-SETUP n'est pas pris pour IXIN OS installé");
 
             const string release = "{\"tag_name\":\"build-2026.10.15-2\",\"assets\":[" +
                 "{\"name\":\"ixin-os-2026.10.15-x86_64.iso.part01\",\"size\":20,\"browser_download_url\":\"https://x/p1\"}," +

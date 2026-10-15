@@ -122,6 +122,11 @@ impossibles à déplacer se trouvent en fin de disque (Windows ne peut pas rédu
 démarrage unique de Windows. Ouvrez le menu de démarrage du PC (**F12** sur Dell et Lenovo, **F9** sur HP,
 **F8** sur Asus, **F11** sur MSI, **Échap** ou **F12** sur Acer) et choisissez **« IXIN OS Setup »**.
 
+**Après l'installation, le PC démarre directement sur Windows, sans le menu IXIN** — certaines mises
+à jour de Windows remettent Windows en premier dans l'ordre de démarrage. Relancez IXIN OS Setup et
+cliquez sur **« Remettre le menu IXIN au démarrage »** (ou choisissez « IXIN » dans le menu de démarrage
+du PC, touches ci-dessus).
+
 **Windows demande la clé de récupération BitLocker** — voir la section 4.
 
 ---

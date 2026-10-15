@@ -19,6 +19,8 @@ namespace IxinSetup
         public const string Description = "IXIN OS Setup";
         public const string EspDirectory = @"EFI\IXIN-SETUP";
         public const string LoaderPath = @"\EFI\IXIN-SETUP\grubx64.efi";
+        public const string IxinLoaderPath = @"\EFI\IXIN\grubx64.efi";   // IXIN OS installé (son menu GRUB)
+        private const string FwBootMgr = "{a5a30fa2-3d06-4e9f-b5f4-a01df9d1fcba}";  // {fwbootmgr} affiché en entier (/v)
         private static readonly Regex Guid = new Regex(@"\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}");
 
         // ── outils ────────────────────────────────────────────────────────────
@@ -123,16 +125,16 @@ namespace IxinSetup
         // ── entrée du firmware ────────────────────────────────────────────────
 
         /// <summary>Crée l'entrée « IXIN OS Setup » dans le menu de démarrage du firmware.</summary>
-        public static string Create()
+        public static string Create(string description = Description, string path = LoaderPath)
         {
-            foreach (var old in Find()) Delete(old);
-            string output = Run("bcdedit.exe", $"/copy {{bootmgr}} /d \"{Description}\"");
+            foreach (var old in ParseEntries(Run("bcdedit.exe", "/enum firmware /v", check: false), path)) Delete(old);
+            string output = Run("bcdedit.exe", $"/copy {{bootmgr}} /d \"{description}\"");
             var m = Guid.Match(output);
             if (!m.Success) throw new SetupException("Identifiant de la nouvelle entrée de démarrage introuvable : " + output.Trim());
             string id = m.Value;
             try
             {
-                Run("bcdedit.exe", $"/set {id} path {LoaderPath}");
+                Run("bcdedit.exe", $"/set {id} path {path}");
                 Run("bcdedit.exe", $"/set {{fwbootmgr}} displayorder {id} /addlast");
             }
             catch
@@ -151,16 +153,40 @@ namespace IxinSetup
             return ParseEntries(output);
         }
 
+        /// <summary>Entrées du firmware qui démarrent IXIN OS installé.</summary>
+        public static List<string> FindIxin()
+        {
+            return ParseEntries(Run("bcdedit.exe", "/enum firmware /v", check: false), IxinLoaderPath);
+        }
+
+        /// <summary>Première entrée de l'ordre de démarrage du firmware (null si inconnue).</summary>
+        public static string FirstInBootOrder()
+        {
+            string output = Run("bcdedit.exe", "/enum {fwbootmgr} /v", check: false);
+            return Guid.Matches(output).Cast<Match>().Select(m => m.Value)
+                .FirstOrDefault(v => !v.Equals(FwBootMgr, StringComparison.OrdinalIgnoreCase));
+        }
+
         /// <summary>
-        /// Cherche dans la sortie de bcdedit les blocs dont le chemin est celui de notre chargeur
+        /// Remet l'entrée en tête de l'ordre de démarrage : Windows se replace parfois en premier
+        /// (après certaines mises à jour), et le PC démarre alors sans afficher le menu IXIN.
+        /// </summary>
+        public static void PutFirst(string id)
+        {
+            Run("bcdedit.exe", $"/set {{fwbootmgr}} displayorder {id} /addfirst");
+            Log.Info("Entrée de démarrage placée en premier : " + id);
+        }
+
+        /// <summary>
+        /// Cherche dans la sortie de bcdedit les blocs dont le chemin est celui du chargeur indiqué
         /// (les noms des champs sont traduits selon la langue de Windows, pas les valeurs).
         /// </summary>
-        public static List<string> ParseEntries(string bcdeditOutput)
+        public static List<string> ParseEntries(string bcdeditOutput, string loaderPath = LoaderPath)
         {
             var ids = new List<string>();
             foreach (var block in Regex.Split(bcdeditOutput.Replace("\r", ""), @"\n\s*\n"))
             {
-                if (block.IndexOf(LoaderPath, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (block.IndexOf(loaderPath, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 var m = Guid.Match(block);
                 if (m.Success && !ids.Contains(m.Value)) ids.Add(m.Value);
             }

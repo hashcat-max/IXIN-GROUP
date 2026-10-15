@@ -27,6 +27,7 @@ namespace IxinSetup
 
         private Facts facts;
         private SetupState state;
+        private List<string> ixinEntries = new List<string>();   // entrées du firmware d'IXIN OS déjà installé
         private long ixinSize = Plan.DefaultIxin;
         private bool useLocalIso;
         private string localIsoPath;
@@ -145,6 +146,8 @@ namespace IxinSetup
                 state = SetupState.Load();
                 facts = await Task.Run(() => Facts.Collect(drive));
                 Log.Info("Analyse :\n" + facts.Describe());
+                ixinEntries = facts.IsUefi ? await Task.Run(() => BootEntry.FindIxin()) : new List<string>();
+                if (ixinEntries.Count > 0) Log.Info("IXIN OS est déjà installé (entrée du firmware " + ixinEntries[0] + ")");
             }
             catch (Exception ex)
             {
@@ -152,8 +155,8 @@ namespace IxinSetup
                 ShowError(ex.Message);
                 return;
             }
-            if (state != null && state.Completed) await ShowManage();
-            else if (state != null) ShowInterrupted();
+            if (state != null && !state.Completed) ShowInterrupted();
+            else if (state != null || ixinEntries.Count > 0) await ShowManage();
             else ShowChecks();
         }
 
@@ -568,53 +571,84 @@ namespace IxinSetup
 
         private async Task ShowManage()
         {
-            ShowPage(Busy("Installation préparée", "Vérification de la préparation existante…"));
+            ShowPage(Busy("IXIN OS Setup", "Vérification de l'installation existante…"));
+            int disk = state?.DiskNumber ?? facts.DiskNumber;
+            string letter = state?.DriveLetter ?? facts.DriveLetter;
             bool hasSetup;
             long reclaimable;
             try
             {
-                hasSetup = await Task.Run(() => Storage.FindSetupPartitions().Any(p => p.Disk == state.DiskNumber));
-                reclaimable = hasSetup ? 0 : await Task.Run(() => Storage.FreeAfter(state.DriveLetter));
+                hasSetup = await Task.Run(() => Storage.FindSetupPartitions().Any(p => p.Disk == disk));
+                reclaimable = hasSetup ? 0 : await Task.Run(() => Storage.FreeAfter(letter));
             }
             catch (Exception ex)
             {
                 ShowError(ex.Message);
                 return;
             }
+            // IXIN OS installé (ou partition d'installation déjà supprimée) : jamais « Annuler la préparation »,
+            // qui rétablirait par exemple le démarrage rapide de Windows sous un double démarrage.
+            if (ixinEntries.Count > 0 || !hasSetup)
+            {
+                ShowInstalled(hasSetup, reclaimable);
+                return;
+            }
 
             var col = Theme.Column();
-            if (hasSetup)
+            col.Controls.Add(Theme.Label("L'installation d'IXIN OS est prête", Theme.Title, Theme.Accent));
+            col.Controls.Add(Theme.Label($"Préparée le {state.Created.Replace('T', ' ')} — {Facts.Gb(state.IxinSize)} libres pour IXIN OS."));
+            if (facts.SecureBoot == true)
+                col.Controls.Add(Theme.Label("Secure Boot est encore activé : désactivez-le dans les paramètres UEFI pour pouvoir démarrer l'installation.", null, Theme.Warning));
+            col.Controls.Add(Theme.Label("Dans l'installation, à l'étape « Partitions », choisissez « Remplacer une partition » puis la zone « Espace libre ».", Theme.Small, Theme.Muted));
+            col.Controls.Add(Theme.Label("« Annuler la préparation » supprime tout ce qu'IXIN OS Setup a ajouté et rend l'espace à Windows.", Theme.Small, Theme.Muted));
+            ShowPage(col,
+                facts.SecureBoot == true
+                    ? Action("Redémarrer vers les paramètres UEFI", () => Restart(true), primary: true)
+                    : Action("Redémarrer et installer IXIN OS", () => Restart(false), primary: true),
+                Action("Annuler la préparation", async () => await RunUndo()),
+                Action("Quitter", Close));
+        }
+
+        private void ShowInstalled(bool setupLeft, long reclaimable)
+        {
+            var col = Theme.Column();
+            col.Controls.Add(Theme.Label("IXIN OS est installé", Theme.Title, Theme.Accent));
+            col.Controls.Add(Theme.Label("Au démarrage du PC, le menu IXIN permet de choisir IXIN OS ou Windows."));
+            var buttons = new List<Button>();
+            if (setupLeft)
             {
-                col.Controls.Add(Theme.Label("L'installation d'IXIN OS est prête", Theme.Title, Theme.Accent));
-                col.Controls.Add(Theme.Label($"Préparée le {state.Created.Replace('T', ' ')} — {Facts.Gb(state.IxinSize)} libres pour IXIN OS."));
-                if (facts.SecureBoot == true)
-                    col.Controls.Add(Theme.Label("Secure Boot est encore activé : désactivez-le dans les paramètres UEFI pour pouvoir démarrer l'installation.", null, Theme.Warning));
-                col.Controls.Add(Theme.Label("Dans l'installation, à l'étape « Partitions », choisissez « Remplacer une partition » puis la zone « Espace libre ».", Theme.Small, Theme.Muted));
-                col.Controls.Add(Theme.Label("« Annuler la préparation » supprime tout ce qu'IXIN OS Setup a ajouté et rend l'espace à Windows.", Theme.Small, Theme.Muted));
-                ShowPage(col,
-                    facts.SecureBoot == true
-                        ? Action("Redémarrer vers les paramètres UEFI", () => Restart(true), primary: true)
-                        : Action("Redémarrer et installer IXIN OS", () => Restart(false), primary: true),
-                    Action("Annuler la préparation", async () => await RunUndo()),
-                    Action("Quitter", Close));
+                col.Controls.Add(Theme.Label("La partition d'installation (IXIN-SETUP) sera supprimée au premier démarrage d'IXIN OS ; " +
+                                             "relancez ensuite IXIN OS Setup pour rendre cet espace à Windows.", null, Theme.Muted));
             }
-            else
+            else if (reclaimable >= Plan.GiB)
             {
-                col.Controls.Add(Theme.Label("IXIN OS est installé", Theme.Title, Theme.Accent));
-                col.Controls.Add(Theme.Label("La partition d'installation a été supprimée après l'installation d'IXIN OS."));
-                if (reclaimable >= Plan.GiB)
-                {
-                    col.Controls.Add(Theme.Label($"{Facts.Gb(reclaimable)} libres se trouvent juste après Windows : vous pouvez les lui rendre.", null, Theme.Muted));
-                    ShowPage(col,
-                        Action($"Rendre {Facts.Gb(reclaimable)} à Windows", async () => await RunReclaim(), primary: true),
-                        Action("Quitter", Close));
-                }
-                else
-                {
-                    ShowPage(col,
-                        Action("Terminer", () => { SetupState.Delete(); Close(); }, primary: true),
-                        Action("Quitter", Close));
-                }
+                col.Controls.Add(Theme.Label($"{Facts.Gb(reclaimable)} libres se trouvent juste après Windows : vous pouvez les lui rendre.", null, Theme.Muted));
+                buttons.Add(Action($"Rendre {Facts.Gb(reclaimable)} à Windows", async () => await RunReclaim(), primary: true));
+            }
+            if (ixinEntries.Count > 0)
+            {
+                col.Controls.Add(Theme.Label("Le PC démarre directement sur Windows, sans afficher le menu IXIN ? Cela peut arriver après " +
+                                             "une mise à jour de Windows : cliquez sur « Remettre le menu IXIN au démarrage ».", Theme.Small, Theme.Muted));
+                buttons.Add(Action("Remettre le menu IXIN au démarrage", RestoreIxinMenu, primary: buttons.Count == 0));
+            }
+            if (state != null && !setupLeft && reclaimable < Plan.GiB)
+                buttons.Add(Action("Terminer", () => { SetupState.Delete(); Close(); }, primary: buttons.Count == 0));
+            buttons.Add(Action("Quitter", Close));
+            ShowPage(col, buttons.ToArray());
+        }
+
+        private void RestoreIxinMenu()
+        {
+            try
+            {
+                BootEntry.PutFirst(ixinEntries[0]);
+                MessageBox.Show("C'est fait : au prochain démarrage, le menu IXIN s'affichera de nouveau (IXIN OS ou Windows).",
+                    "IXIN OS Setup", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.ToString());
+                ShowError(ex.Message);
             }
         }
 
@@ -656,7 +690,7 @@ namespace IxinSetup
             {
                 await Task.Run(() =>
                 {
-                    Storage.ExtendToMax(state.DriveLetter);
+                    Storage.ExtendToMax(state?.DriveLetter ?? facts.DriveLetter);
                     foreach (var id in BootEntry.Find()) BootEntry.Delete(id);
                     SetupState.Delete();
                 });
