@@ -340,6 +340,11 @@ namespace IxinSetup
             bool local = useLocalIso;
             string isoPath = localIsoPath;
             var size = new NumericUpDown { Width = 90, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body };
+            foreach (Control part in size.Controls)   // zone de saisie et flèches : sinon blanches sur la page sombre
+            {
+                part.BackColor = Theme.Card;
+                part.ForeColor = Theme.Text;
+            }
             var sizeHelp = Theme.Label("", Theme.Small, Theme.Muted);
             sizeHelp.Margin = new Padding(8, 6, 0, 0);
             void SizeRange()
