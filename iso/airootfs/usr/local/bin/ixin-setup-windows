@@ -47,6 +47,7 @@ STYLE = """
 QWidget { background: #0b0c10; color: #e9ecef; font-family: Inter; font-size: 10.5pt; }
 QLabel#title { font-size: 17pt; font-weight: 600; color: #ffffff; }
 QLabel#accent { color: #19f3a4; font-weight: 600; }
+QLabel#muted { color: #8d9299; font-size: 9.5pt; }
 QFrame#card { background: #111318; border: 1px solid #1f232b; border-radius: 12px; }
 QFrame#card QLabel { background: transparent; }
 QPushButton { background: #151820; border: 1px solid #23272f; border-radius: 8px; padding: 10px 18px; }
@@ -102,9 +103,9 @@ def main():
     step.setObjectName("accent")
     cl.addWidget(step)
     steps = QLabel(
-        "1. « Remplacer une partition » est déjà sélectionné.<br>"
-        "2. Cliquez sur la zone grise <b>« Espace libre »</b> dans la barre du disque.<br>"
-        "3. Cochez <b>« Chiffrer le système »</b> et choisissez une phrase secrète (recommandé).<br><br>"
+        "1. Le disque et l'espace préparés par IXIN OS Setup sont déjà sélectionnés "
+        "(sinon, cliquez sur la zone grise <b>« Espace libre »</b> dans la barre du disque).<br>"
+        "2. Cochez <b>« Chiffrer le système »</b> et choisissez une phrase secrète (recommandé).<br><br>"
         "Pour protéger Windows, les autres choix (effacer le disque, réduire Windows) sont bloqués.")
     steps.setWordWrap(True)
     cl.addWidget(steps)
@@ -114,6 +115,12 @@ def main():
                    "entre IXIN OS et Windows.")
     after.setWordWrap(True)
     lay.addWidget(after)
+
+    expert = QLabel("Utilisateurs avertis : « Partitionnement manuel » permet de tout choisir "
+                    "(systèmes de fichiers, /home séparé, swap…).")
+    expert.setObjectName("muted")
+    expert.setWordWrap(True)
+    lay.addWidget(expert)
 
     buttons = QHBoxLayout()
     later = QPushButton("Découvrir IXIN OS d'abord")

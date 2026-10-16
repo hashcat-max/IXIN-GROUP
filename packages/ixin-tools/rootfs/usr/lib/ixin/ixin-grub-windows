@@ -1,18 +1,21 @@
 #!/bin/sh
 # IXIN OS — entrée « Windows » du menu de démarrage (GRUB)
 #
-# Windows installé sur la partition EFI partagée avec IXIN OS démarre par sa propre entrée
-# du firmware (BootNext, puis redémarrage) : exactement comme sans IXIN, si bien que BitLocker
+# Windows démarre par sa propre entrée du firmware (BootNext, puis redémarrage) : exactement comme sans IXIN, si bien que BitLocker
 # ne demande pas sa clé de récupération — ce qu'il fait souvent quand GRUB lance lui-même le
 # chargeur de Windows. Sans entrée du firmware, GRUB lance Windows directement.
 #
 #   --menu        l'entrée du menu (appelé par /etc/grub.d/26_ixin_windows)
 #   --skip-list   ce Windows, pour qu'os-prober ne l'ajoute pas une seconde fois
 #                 (/etc/default/grub.d/ixin-windows.cfg)
+#
+# Windows est cherché dans la partition EFI d'IXIN OS, puis dans les autres partitions EFI du PC :
+# partition EFI dédiée créée par IXIN OS Setup, ou partition de Windows sur un autre disque.
 set -u
 LOADER=/EFI/Microsoft/Boot/bootmgfw.efi
+ESP_TYPE=c12a7328-f81f-11d2-ba4b-00a0c93ec93b
 
-# Partition EFI montée contenant le chargeur de Windows (vfat : noms insensibles à la casse)
+# 1. Partition EFI montée contenant le chargeur de Windows (vfat : noms insensibles à la casse)
 dev=""
 for mp in /boot/efi /efi /boot; do
     [ "$(findmnt -no FSTYPE --mountpoint "$mp" 2>/dev/null)" = vfat ] || continue
@@ -20,6 +23,22 @@ for mp in /boot/efi /efi /boot; do
     dev="$(findmnt -no SOURCE --mountpoint "$mp")"
     break
 done
+# 2. Sinon les autres partitions EFI, montées en lecture seule le temps de vérifier
+if [ -z "$dev" ]; then
+    for cand in $(lsblk -rpno NAME,PARTTYPE 2>/dev/null | awk -v t="$ESP_TYPE" 'tolower($2) == t { print $1 }'); do
+        mp="$(findmnt -no TARGET --source "$cand" 2>/dev/null | head -n 1)"
+        if [ -n "$mp" ]; then
+            [ -f "$mp$LOADER" ] && dev="$cand"
+        elif tmp="$(mktemp -d 2>/dev/null)"; then
+            if mount -o ro,nosuid,nodev,noexec -t vfat "$cand" "$tmp" 2>/dev/null; then
+                [ -f "$tmp$LOADER" ] && dev="$cand"
+                umount "$tmp"
+            fi
+            rmdir "$tmp"
+        fi
+        [ -n "$dev" ] && break
+    done
+fi
 [ -b "$dev" ] || exit 0
 uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null)"
 [ -n "$uuid" ] || exit 0

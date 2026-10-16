@@ -77,10 +77,14 @@ finalize() {
     cp -r /usr/share/grub/themes/ixin /boot/grub/themes/ixin
 
     if grep -qwF 'ixin.setup=windows' /proc/cmdline; then
-        log "Installation lancée depuis Windows : nettoyage de l'installateur au premier démarrage"
-        mkdir -p /var/lib/ixin
-        touch /var/lib/ixin/setup-from-windows
-        systemctl enable ixin-setup-cleanup.service
+        if grep -qwF 'ixin.keepsetup=1' /proc/cmdline; then
+            log "Installation lancée depuis Windows : IXIN-SETUP et « IXIN OS Setup » gardés (option avancée)"
+        else
+            log "Installation lancée depuis Windows : nettoyage de l'installateur au premier démarrage"
+            mkdir -p /var/lib/ixin
+            touch /var/lib/ixin/setup-from-windows
+            systemctl enable ixin-setup-cleanup.service
+        fi
     fi
 
     log "Retrait des scripts propres au live"

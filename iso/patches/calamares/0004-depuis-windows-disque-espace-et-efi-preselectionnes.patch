@@ -1,0 +1,237 @@
+--- a/src/modules/partition/gui/ChoicePage.cpp
++++ b/src/modules/partition/gui/ChoicePage.cpp
+@@ -51,6 +51,8 @@
+ #include <QButtonGroup>
+ #include <QComboBox>
+ #include <QDir>
++#include <QFile>
++#include <QFileInfo>
+ #include <QFutureWatcher>
+ #include <QLabel>
+ #include <QListView>
+@@ -63,6 +65,113 @@
+ using InstallChoice = Config::InstallChoice;
+ using SwapChoice = Config::SwapChoice;
+ 
++// ── IXIN OS : installation lancée depuis Windows par IXIN OS Setup ─────────────
++//
++// IXIN OS Setup a préparé sous Windows une partition « IXIN-SETUP » (l'ISO) suivie de l'espace
++// libre pour IXIN OS, et transmet par la ligne de commande du noyau la partition EFI à utiliser
++// (ixin.esp=PARTUUID). Ce disque, cet espace et cette partition EFI sont présélectionnés.
++
++/// Valeur d'une option du noyau (« ixin.esp=… »), vide si absente.
++static QString
++ixinKernelOption( const QString& name )
++{
++    QFile cmdline( QStringLiteral( "/proc/cmdline" ) );
++    if ( !cmdline.open( QIODevice::ReadOnly ) )
++    {
++        return QString();
++    }
++    const QString prefix = name + QLatin1Char( '=' );
++    const QStringList words = QString::fromUtf8( cmdline.readAll() ).simplified().split( QLatin1Char( ' ' ) );
++    for ( const QString& word : words )
++    {
++        if ( word.startsWith( prefix ) )
++        {
++            return word.mid( prefix.length() );
++        }
++    }
++    return QString();
++}
++
++static bool
++ixinFromWindows()
++{
++    return ixinKernelOption( QStringLiteral( "ixin.setup" ) ) == QStringLiteral( "windows" );
++}
++
++/// La partition IXIN-SETUP, reconnue à son étiquette (lue par kpmcore ou par udev).
++static bool
++ixinIsSetupPartition( const Partition* partition )
++{
++    if ( !partition || isPartitionFreeSpace( partition ) )
++    {
++        return false;
++    }
++    static const QString byLabel
++        = QFileInfo( QStringLiteral( "/dev/disk/by-label/IXIN-SETUP" ) ).canonicalFilePath();
++    return partition->fileSystem().label() == QStringLiteral( "IXIN-SETUP" )
++        || ( !byLabel.isEmpty() && partition->partitionPath() == byLabel );
++}
++
++static bool
++ixinHasSetupPartition( Device* device )
++{
++    if ( !device || !device->partitionTable() )
++    {
++        return false;
++    }
++    for ( auto it = PartitionIterator::begin( device ); it != PartitionIterator::end( device ); ++it )
++    {
++        if ( ixinIsSetupPartition( *it ) )
++        {
++            return true;
++        }
++    }
++    return false;
++}
++
++/// L'espace libre préparé : la plus grande zone libre après IXIN-SETUP (une partition EFI créée
++/// par IXIN OS Setup peut les séparer), à défaut la plus grande zone libre du disque.
++static QModelIndex
++ixinPreparedFreeSpace( QAbstractItemModel* model )
++{
++    auto* partitions = qobject_cast< PartitionModel* >( model );
++    if ( !partitions )
++    {
++        return QModelIndex();
++    }
++    qint64 setupEnd = -1;
++    for ( int row = 0; row < partitions->rowCount(); ++row )
++    {
++        const Partition* p = partitions->partitionForIndex( partitions->index( row, 0 ) );
++        if ( ixinIsSetupPartition( p ) )
++        {
++            setupEnd = p->lastSector();
++        }
++    }
++    QModelIndex afterSetup, anywhere;
++    qint64 afterSize = 0, anySize = 0;
++    for ( int row = 0; row < partitions->rowCount(); ++row )
++    {
++        const QModelIndex index = partitions->index( row, 0 );
++        const Partition* p = partitions->partitionForIndex( index );
++        if ( !p || !isPartitionFreeSpace( p ) )
++        {
++            continue;
++        }
++        if ( p->capacity() > anySize )
++        {
++            anySize = p->capacity();
++            anywhere = index;
++        }
++        if ( setupEnd >= 0 && p->firstSector() > setupEnd && p->capacity() > afterSize )
++        {
++            afterSize = p->capacity();
++            afterSetup = index;
++        }
++    }
++    return afterSetup.isValid() ? afterSetup : anywhere;
++}
++
+ /**
+  * @brief ChoicePage::ChoicePage is the default constructor. Called on startup as part of
+  *      the module loading code path.
+@@ -187,6 +296,22 @@
+              } );
+     setModelToComboBox( m_drivesCombo, core->deviceModel() );
+ 
++    // IXIN OS : depuis Windows, le disque préparé par IXIN OS Setup (avec IXIN-SETUP) est présélectionné,
++    // même s'il n'est pas le premier (les disques sont classés par nom : nvme0n1, sda, sdb…).
++    if ( ixinFromWindows() )
++    {
++        DeviceModel* devices = core->deviceModel();
++        for ( int i = 0; i < devices->rowCount(); ++i )
++        {
++            if ( ixinHasSetupPartition( devices->deviceForIndex( devices->index( i ) ) ) )
++            {
++                cDebug() << "IXIN OS : disque préparé par IXIN OS Setup" << i;
++                m_drivesCombo->setCurrentIndex( i );
++                break;
++            }
++        }
++    }
++
+     connect( m_drivesCombo, qOverload< int >( &QComboBox::currentIndexChanged ), this, &ChoicePage::applyDeviceChoice );
+     connect( m_encryptWidget, &EncryptWidget::stateChanged, this, &ChoicePage::onEncryptWidgetStateChanged );
+     connect(
+@@ -560,6 +685,10 @@
+         {
+             m_beforePartitionBarsView->selectionModel()->setCurrentIndex( priorSelection, QItemSelectionModel::Select );
+         }
++        else if ( isVisible() )
++        {
++            ixinSelectPreparedSpace();  // sinon à l'affichage de la page (PartitionViewStep::onActivate)
++        }
+         break;
+ 
+     case InstallChoice::Alongside:
+@@ -610,6 +739,24 @@
+ }
+ 
+ void
++ChoicePage::ixinSelectPreparedSpace()
++{
++    if ( m_ixinSpaceSelected || !ixinFromWindows() || m_config->installChoice() != InstallChoice::Replace
++         || !m_beforePartitionBarsView || !m_beforePartitionBarsView->selectionModel()
++         || m_beforePartitionBarsView->selectionModel()->currentIndex().isValid() )
++    {
++        return;
++    }
++    const QModelIndex prepared = ixinPreparedFreeSpace( m_beforePartitionBarsView->model() );
++    if ( prepared.isValid() )
++    {
++        cDebug() << "IXIN OS : espace libre préparé par IXIN OS Setup présélectionné";
++        m_ixinSpaceSelected = true;
++        m_beforePartitionBarsView->selectionModel()->setCurrentIndex( prepared, QItemSelectionModel::Select );
++    }
++}
++
++void
+ ChoicePage::doAlongsideSetupSplitter( const QModelIndex& current, const QModelIndex& previous )
+ {
+     Q_UNUSED( previous )
+@@ -1254,6 +1401,16 @@
+                 m_efiComboBox->setCurrentIndex( i );
+             }
+         }
++        // IXIN OS : la partition EFI désignée par IXIN OS Setup (ixin.esp=PARTUUID) l'emporte
++        const QString wanted = ixinKernelOption( QStringLiteral( "ixin.esp" ) );
++        for ( int i = 0; !wanted.isEmpty() && i < efiSystemPartitions.count(); ++i )
++        {
++            if ( efiSystemPartitions.at( i )->uuid().compare( wanted, Qt::CaseInsensitive ) == 0 )
++            {
++                cDebug() << "IXIN OS : partition EFI désignée par IXIN OS Setup" << efiSystemPartitions.at( i )->partitionPath();
++                m_efiComboBox->setCurrentIndex( i );
++            }
++        }
+     }
+ }
+ 
+--- a/src/modules/partition/gui/ChoicePage.h
++++ b/src/modules/partition/gui/ChoicePage.h
+@@ -85,6 +85,11 @@
+      */
+     void applyActionChoice( Config::InstallChoice choice );
+ 
++    /** @brief IXIN OS : installation lancée depuis Windows, présélectionne l'espace libre
++     *  préparé par IXIN OS Setup (une seule fois ; l'utilisateur garde ensuite la main).
++     */
++    void ixinSelectPreparedSpace();
++
+     int lastSelectedDeviceIndex();
+     void setLastSelectedDeviceIndex( int index );
+ 
+@@ -169,6 +174,7 @@
+     QPointer< QComboBox > m_efiComboBox;
+ 
+     int m_lastSelectedDeviceIndex = -1;
++    bool m_ixinSpaceSelected = false;  // IXIN OS : espace préparé déjà présélectionné
+     int m_osproberEntriesCount = -1;
+     QString m_osproberOneEntryName;
+ 
+--- a/src/modules/partition/PartitionViewStep.cpp
++++ b/src/modules/partition/PartitionViewStep.cpp
+@@ -471,6 +471,11 @@
+         m_choicePage->applyActionChoice( Config::InstallChoice::Alongside );
+         //        m_choicePage->reset();
+     }
++    // IXIN OS : installation lancée depuis Windows, espace préparé présélectionné à l'arrivée sur la page
++    if ( m_widget->currentWidget() == m_choicePage && m_config->installChoice() == Config::InstallChoice::Replace )
++    {
++        m_choicePage->ixinSelectPreparedSpace();
++    }
+ }
+ 
+ static QString

@@ -22,14 +22,17 @@ for esp in /boot/efi /efi /boot; do
 done
 
 # 3. Partition IXIN-SETUP : supprimée seulement si elle est reconnue sans ambiguïté
-#    (exFAT, étiquette IXIN-SETUP, contient ixin-os.iso, non montée, sur le disque où
-#    IXIN OS est installé — jamais sur une clé USB par exemple).
-sys_disk=""
-for m in /boot/efi /efi /boot; do
-    src="$(findmnt -no SOURCE --mountpoint "$m" 2>/dev/null)" || continue
+#    (exFAT, étiquette IXIN-SETUP, contient ixin-os.iso, non montée, sur un disque d'IXIN OS —
+#    jamais sur une clé USB par exemple). Disques d'IXIN OS : celui du système (/, à travers
+#    LUKS), de /boot et de la partition EFI ; deux disques quand la partition EFI de Windows,
+#    réutilisée, est sur un autre disque que celui de Windows et d'IXIN OS.
+disk_of() { lsblk -nsro NAME,TYPE "$1" 2>/dev/null | awk '$2 == "disk" { print "/dev/" $1; exit }'; }
+ixin_disks=" "
+for m in / /boot /boot/efi /efi; do
+    src="$(findmnt -nvo SOURCE --mountpoint "$m" 2>/dev/null)" || continue
     [[ -b "$src" ]] || continue
-    sys_disk="/dev/$(lsblk -no PKNAME "$src" | head -1)"
-    break
+    d="$(disk_of "$src")"
+    [[ -n "$d" && "$ixin_disks" != *" $d "* ]] && ixin_disks+="$d "
 done
 mapfile -t parts < <(blkid -c /dev/null -t LABEL=IXIN-SETUP -o device 2>/dev/null)
 if (( ${#parts[@]} == 1 )); then
@@ -38,8 +41,8 @@ if (( ${#parts[@]} == 1 )); then
         log "$dev n'est pas une partition exFAT : conservée"
     elif findmnt -rn -S "$dev" >/dev/null; then
         log "$dev est montée : conservée"
-    elif [[ -z "$sys_disk" || "/dev/$(lsblk -no PKNAME "$dev" | head -1)" != "$sys_disk" ]]; then
-        log "$dev n'est pas sur le disque d'IXIN OS (${sys_disk:-inconnu}) : conservée"
+    elif [[ "$ixin_disks" != *" /dev/$(lsblk -no PKNAME "$dev" | head -1) "* ]]; then
+        log "$dev n'est pas sur un disque d'IXIN OS (${ixin_disks:1}) : conservée"
     else
         tmp="$(mktemp -d)"
         has_iso=0
