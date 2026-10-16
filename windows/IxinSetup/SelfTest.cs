@@ -286,7 +286,9 @@ namespace IxinSetup
                 Expect(BootEntry.Find().Contains(other), "entrée vers une partition EFI dédiée créée");
                 string shown = BootEntry.Run("bcdedit.exe", $"/enum {other} /v", check: false);
                 Console.WriteLine(shown.Trim());
-                Expect(shown.IndexOf("partition=" + letter + ":", StringComparison.OrdinalIgnoreCase) >= 0,
+                // Sur un vrai disque : « partition=Z: » ; sur ce disque virtuel, Windows note « vhd=[C:]\…\ixin-boot-test.vhdx »
+                Expect(shown.IndexOf("partition=" + letter + ":", StringComparison.OrdinalIgnoreCase) >= 0
+                       || shown.IndexOf(Path.GetFileName(vhd), StringComparison.OrdinalIgnoreCase) >= 0,
                        "entrée dirigée vers la partition EFI indiquée (" + letter + ":)");
             }
             catch (Exception ex)
