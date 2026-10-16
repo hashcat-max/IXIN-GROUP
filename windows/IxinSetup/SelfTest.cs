@@ -80,7 +80,9 @@ namespace IxinSetup
                 var facts = Facts.Collect(win);
                 // Seuls les disques virtuels comptent (pas la partition EFI de la machine de test) ; la
                 // partition EFI simulée joue le rôle de celle qui démarre Windows.
-                int espDisk = esp != null ? DiskOf(esp) : -1;
+                int espDisk = layout == EspLayout.SameDisk ? facts.DiskNumber
+                    : layout == EspLayout.OtherDisk ? DiskOfVhd(espVhd) : -1;
+                Expect(facts.DiskNumber == DiskOfVhd(pcVhd), "disque de « Windows » simulé reconnu");
                 facts.Esps.RemoveAll(e => e.Disk != facts.DiskNumber && e.Disk != espDisk);
                 foreach (var e in facts.Esps) e.IsSystem = e.Disk == espDisk;
                 facts.IsUefi = true;
@@ -213,7 +215,12 @@ namespace IxinSetup
             catch (Exception ex)
             {
                 Expect(false, "exception : " + ex);
-                try { Installer.Undo(SetupState.Load(), null, testMode: true, testEspLetter: null); } catch (Exception) { }
+                // Remise en état seulement si une préparation a commencé sur le disque virtuel
+                var started = SetupState.Load();
+                if (started != null && started.DiskNumber >= 0 && started.DriveLetter == win)
+                {
+                    try { Installer.Undo(started, null, testMode: true, testEspLetter: null); } catch (Exception) { }
+                }
                 SetupState.Delete();
             }
             finally
@@ -412,10 +419,11 @@ format quick fs=ntfs label=""Donnees""
             throw new SetupException("Pas de lettre de lecteur libre pour le test");
         }
 
-        private static int DiskOf(string letter)
+        /// <summary>Numéro du disque d'un disque virtuel attaché (la lettre d'une partition EFI n'est pas visible par Get-Partition).</summary>
+        private static int DiskOfVhd(string vhd)
         {
-            var o = Ps.One(@"param([string]$Letter) [pscustomobject]@{ Disk = [int](Get-Partition -DriveLetter $Letter).DiskNumber }",
-                new Hashtable { ["Letter"] = letter[0] });
+            var o = Ps.One(@"param([string]$Path) [pscustomobject]@{ Disk = [int](Get-DiskImage -ImagePath $Path | Get-Disk).Number }",
+                new Hashtable { ["Path"] = vhd });
             return (int)Ps.Long(o, "Disk");
         }
 
