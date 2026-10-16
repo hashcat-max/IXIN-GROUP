@@ -4,15 +4,24 @@
 > **os.ixin.online** (presentation, downloads, documentation). Everything stated here exists and has been
 > tested, unless explicitly marked otherwise. **Please do not invent features that are not listed here.**
 >
-> **Last update: October 16, 2026 — current release `build-2026.10.15-3`** (new: §3 screenshots of the whole
-> "install from Windows" journey, §4 update server live on GitHub Pages, §9 fixes coming with the next build).
+> **Last update: October 16, 2026 — current release `build-2026.10.16-4`** (new: §0 release `-4`, §3 screenshots
+> of the whole "install from Windows" journey, §4 update server live on GitHub Pages, §8 new downloads).
 > Companion file (French, ready to adapt into a page): `docs/INSTALLATION-WINDOWS.md`, the complete
 > "Installer IXIN OS à côté de Windows" user guide.
 
 ---
 
-## 0. What's new in `build-2026.10.15-3` (for a "Nouveautés" section)
+## 0. What's new (for a "Nouveautés" section)
 
+### `build-2026.10.16-4` (October 16, 2026) — current release
+Two fixes on top of `-3`, same features:
+- **Installation started from Windows**: at the "Partitions" step the installer now offers only "Remplacer une
+  partition" (the free space prepared by IXIN OS Setup) and manual partitioning. The "Installer à côté" option, which
+  would have shrunk Windows a second time, is gone — as the welcome window already said.
+- **IXIN OS Setup**: a button that cannot be used yet (e.g. "Continuer" before the BitLocker key is confirmed) is now
+  clearly greyed out instead of staying bright green.
+
+### `build-2026.10.15-3` (October 15, 2026) — the first complete release
 - **Install from Windows, without a USB stick**: new program **IXIN OS Setup** (`IXIN-OS-Setup.exe`, 3.7 MB,
   Windows 10 / 11). It checks the PC, downloads IXIN OS, makes room on the disk and restarts into the installer.
   Windows and its files stay in place; everything can be undone until IXIN OS is installed. (§5.1)
@@ -25,7 +34,7 @@
   layout with a separate `/boot` partition, compatible with the small EFI partition of Windows PCs; the NTFS tools
   needed to shrink Windows from a USB installation are included again.
 - Releases `build-2026.10.15-1` and `-2` are **obsolete** (no IXIN Update, no Windows installer, known boot issue on
-  `-1`): the site should only link to the **latest** release.
+  `-1`), and `-3` is replaced by `-4`: the site should only link to the **latest** release.
 
 ## 1. What IXIN OS is
 
@@ -95,14 +104,13 @@ BitLocker on, Secure Boot on. Nothing is real: the BitLocker key shown is fake. 
 - `ixin-os-setup-reduction-bloquee.png`: a blocking check ("C: ne peut pas être réduit assez") with the
   "Débloquer la réduction" button — for a troubleshooting section.
 
-**Install from Windows, part 2: on the IXIN side** (1280×800, the published ISO `build-2026.10.15-3` in a VM,
+**Install from Windows, part 2: on the IXIN side** (1280×800, the published ISO `build-2026.10.16-4` in a VM,
 on a simulated Windows PC prepared like IXIN OS Setup does):
 - `depuis-windows-guide.png`: the welcome window shown when the PC restarts into IXIN OS ("IXIN OS Setup a préparé
   un espace libre de 73 Go pour IXIN OS"), with "Lancer l'installation"
 - `depuis-windows-partitions.png`: the "Partitions" step in this mode: only "Remplacer une partition" (preselected)
   and manual partitioning; the "Espace libre" zone selected and "Chiffrer le système" ticked; the "Après" bar shows
-  IXIN-BOOT (1 GB) + IXIN (72 GB, LUKS2) in the free space, every Windows partition untouched. ⚠️ This shows the
-  **next** build: in `build-2026.10.15-3` an extra "Installer à côté" option still appears here (§9).
+  IXIN-BOOT (1 GB) + IXIN (72 GB, LUKS2) in the free space, every Windows partition untouched.
 - then `menu-demarrage-ixin-windows.png` (above): the IXIN / Windows menu after installation.
 
 **USB installer** (1280×800):
@@ -229,8 +237,7 @@ Requirements (both): 64-bit (x86_64) PC, **UEFI** recommended (legacy BIOS works
   7. in the IXIN OS live system, a welcome window explains the single choice to make: at the **"Partitions"** step,
      "Remplacer une partition" is preselected → click the grey **"Espace libre"** zone → tick **"Chiffrer le système"**
      (recommended). In this mode the disk cannot be erased and Windows partitions cannot be selected
-     (screenshots `depuis-windows-guide.png`, `depuis-windows-partitions.png`; in `build-2026.10.15-3` an
-     "Installer à côté" option still appears too, removed in the next build — §9);
+     (screenshots `depuis-windows-guide.png`, `depuis-windows-partitions.png`);
   8. finish the installation (name, password), restart: the IXIN menu offers IXIN OS and Windows.
 - On the first start of IXIN OS, the temporary "IXIN-SETUP" partition (6 GB) and the "IXIN OS Setup" menu are
   removed automatically. Running IXIN OS Setup again in Windows then offers **"Rendre 6 Go à Windows"**.
@@ -294,16 +301,18 @@ EFI partition (512 MB, or the existing Windows one) + separate **1 GB `/boot`** 
 
 ## 8. Downloads
 
-Current release: **`build-2026.10.15-3`** (October 15, 2026) — https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.15-3
+Current release: **`build-2026.10.16-4`** (October 16, 2026) — https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.16-4
 
 | File | Size | For |
 |---|---|---|
 | `IXIN-OS-Setup.exe` | 3.7 MB | Windows 10 / 11: install without a USB stick (downloads IXIN OS itself) |
-| `ixin-os-2026.10.15-x86_64.iso.part00` / `.part01` / `.part02` | 1.99 + 1.99 + 1.07 GB (**5.06 GB** in total) | USB stick, virtual machine |
-| `ixin-os-2026.10.15-x86_64.iso.sha256` | — | integrity check of the reassembled ISO |
+| `ixin-os-2026.10.16-x86_64.iso.part00` / `.part01` / `.part02` | 1.99 + 1.99 + 1.08 GB (**5.06 GB** in total) | USB stick, virtual machine |
+| `ixin-os-2026.10.16-x86_64.iso.sha256` | — | integrity check of the reassembled ISO |
 
-- ISO SHA-256: `6c14f81bd3420bf759ece72274d2a58d42c1a28b92f8a85b54ae9519222154f5`
-- `IXIN-OS-Setup.exe` SHA-256: `73f4d2f5eae8498342e349b80a37ccf340d99496590a0d98f3dd96ecc01b6466`
+- ISO SHA-256: `e48619f63a1c829101f0d576d7c619155f534610f3b7c10f80565c0da496e709`
+- `IXIN-OS-Setup.exe` SHA-256: `d7c8f44bc16f72e607c2bfbacbeb29610298b68ffedb63c163e1ea8f7262c370`
+- These values change with every release: if the site shows them, read them from the API below (each asset has a
+  `digest` field, e.g. `sha256:d7c8…c370`) rather than hard-coding them.
 - **Stable links** (always the latest release, good for buttons):
   - `https://github.com/hashcat-max/IXIN-GROUP/releases/latest/download/IXIN-OS-Setup.exe`
   - release page: `https://github.com/hashcat-max/IXIN-GROUP/releases/latest`
@@ -319,8 +328,8 @@ Current release: **`build-2026.10.15-3`** (October 15, 2026) — https://github.
 
 ## 9. Project status (to stay honest on the site)
 
-- Version: **Beta (v0.1)**, rolling, dated builds. Latest: **`build-2026.10.15-3`**, the first complete release
-  (IXIN Update + install from Windows). Older releases `-1` and `-2` are obsolete.
+- Version: **Beta (v0.1)**, rolling, dated builds. Latest: **`build-2026.10.16-4`** (`-3`, the first complete
+  release with IXIN Update and install from Windows, plus two fixes — §0). Older releases are obsolete.
 - Tested in a VM: ISO build, UEFI boot, live desktop + taskbar, IXIN Center, graphical installer, full encrypted install,
   reboot of the installed system (GRUB → IXIN unlock screen → login → desktop; firewall, AppArmor, LUKS2 and encrypted
   DNS checked on the installed system).
@@ -336,11 +345,9 @@ Current release: **`build-2026.10.15-3`** (October 15, 2026) — https://github.
 - Known limits: Secure Boot must be off; IXIN OS Setup is not code-signed (SmartScreen warning); BIOS / MBR PCs need a USB
   stick; IXIN OS Setup installs on the Windows disk only; no automatic **uninstall** of IXIN OS yet; "Installer à côté"
   from a USB stick not yet tested with a real Windows.
-- **Fixed in the source, coming with the next build** (not yet in `build-2026.10.15-3`):
-  - installer started from Windows: the "Installer à côté" option (shrinking Windows a second time) is no longer
-    offered — in `-3` it still appears, although the welcome window says it is blocked;
-  - IXIN OS Setup: a disabled button is now clearly greyed out (in `-3`, a disabled "Continuer" stayed bright green).
-  The screenshots of §3 already show these fixed screens.
+- `build-2026.10.16-4` checked after publication: SHA-256 of the reassembled ISO, then the published ISO started in a
+  VM on a simulated Windows PC in the "launched from Windows" mode: the "Partitions" step offers only "Remplacer une
+  partition" and manual partitioning.
 - Ideas for later versions: Secure Boot signing, code signing for IXIN OS Setup, uninstall from Windows,
   an optional "macOS-style" layout (dock), an optional security toolbox, translations.
 
