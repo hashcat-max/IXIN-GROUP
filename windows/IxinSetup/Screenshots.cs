@@ -40,6 +40,7 @@ namespace IxinSetup
                 ("1-analyse", "analyse", Pc(), null, null),
                 ("2-verification", "verification", Pc(), null, null),
                 ("3-espace", "espace", Pc(), null, null),
+                ("3b-options-avancees", "avancees", Pc(), null, null),
                 ("4-cle-bitlocker", "bitlocker", Pc(), null, null),
                 ("5-confirmation", "confirmation", Pc(), null, null),
                 ("6-preparation", "preparation", Pc(), null, null),
@@ -48,6 +49,7 @@ namespace IxinSetup
                 ("9-installation-prete", "prete", Pc(secureBoot: false), prepared, null),
                 ("10-ixin-installe", "installee", Pc(secureBoot: false), installed, ixinEntry),
                 ("reduction-bloquee", "verification", Pc(shrinkBlocked: true), null, null),
+                ("efi-autre-disque", "verification", Pc(secureBoot: false, espOnOtherDisk: true), null, null),
             };
 
             using (var form = new MainForm(analyse: false))
@@ -69,8 +71,11 @@ namespace IxinSetup
             return 0;
         }
 
-        /// <summary>PC d'exemple : Windows 11, SSD de 1 To, C: avec 412 Go libres, BitLocker actif.</summary>
-        private static Facts Pc(bool secureBoot = true, bool shrinkBlocked = false)
+        /// <summary>
+        /// PC d'exemple : Windows 11, SSD de 1 To, C: avec 412 Go libres, BitLocker actif ; sa partition
+        /// EFI est sur le SSD, ou sur un second disque (PC installé avec ses deux disques branchés).
+        /// </summary>
+        private static Facts Pc(bool secureBoot = true, bool shrinkBlocked = false, bool espOnOtherDisk = false)
         {
             return new Facts
             {
@@ -87,8 +92,15 @@ namespace IxinSetup
                 Free = 412 * GiB,
                 // Réduction limitée par des fichiers système en fin de disque (cas « Débloquer la réduction »)
                 SizeMin = shrinkBlocked ? 925 * GiB : 520 * GiB,
-                EspPartitionNumber = 1,
-                EspSize = 100L * 1024 * 1024,
+                Esps = new List<EspInfo>
+                {
+                    new EspInfo
+                    {
+                        Disk = espOnOtherDisk ? 1 : 0, Number = 1, Offset = 1L << 20, Size = 100L << 20, Free = 71L << 20,
+                        Guid = "{5c3e8a1f-2b7d-4e90-a6c1-3f8d2e7b9a04}", FileSystem = "FAT32", IsSystem = true, EspType = true,
+                        DiskName = espOnOtherDisk ? "Disque dur 2 To" : "SSD NVMe 1 To",
+                    },
+                },
                 WindowsName = "Windows 11 Professional 24H2 (build 26100)",
                 HasBattery = true,
                 OnBattery = false,

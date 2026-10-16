@@ -19,6 +19,7 @@ namespace IxinSetup
         public const string Description = "IXIN OS Setup";
         public const string EspDirectory = @"EFI\IXIN-SETUP";
         public const string LoaderPath = @"\EFI\IXIN-SETUP\grubx64.efi";
+        public const string OptionsFile = "options.cfg";   // options de l'installation, lues par le menu de démarrage
         public const string IxinLoaderPath = @"\EFI\IXIN\grubx64.efi";   // IXIN OS installé (son menu GRUB)
         private const string FwBootMgr = "{a5a30fa2-3d06-4e9f-b5f4-a01df9d1fcba}";  // {fwbootmgr} affiché en entier (/v)
         private static readonly Regex Guid = new Regex(@"\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}");
@@ -91,7 +92,22 @@ namespace IxinSetup
             }
         }
 
-        public static void InstallLoader(string espLetter)
+        /// <summary>
+        /// Contenu de options.cfg : options passées au système d'installation d'IXIN OS par le menu
+        /// de démarrage (windows/boot/setup-grub.cfg). ASCII seulement : lu par GRUB.
+        /// </summary>
+        public static string OptionsContent(string espGuid, bool keepSetupPartition)
+        {
+            var options = new List<string>();
+            string partuuid = (espGuid ?? "").Trim('{', '}', ' ').ToLowerInvariant();
+            if (Regex.IsMatch(partuuid, "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))
+                options.Add("ixin.esp=" + partuuid);
+            if (keepSetupPartition) options.Add("ixin.keepsetup=1");
+            return "# Options choisies dans IXIN OS Setup (lues par le menu de demarrage de l'installation)\n" +
+                   "set ixin_options=\"" + string.Join(" ", options) + "\"\n";
+        }
+
+        public static void InstallLoader(string espLetter, string options = null)
         {
             string dir = espLetter + @":\" + EspDirectory;
             byte[] loader = Loader();
@@ -104,6 +120,8 @@ namespace IxinSetup
                 "Menu de démarrage de l'installation d'IXIN OS, ajouté par IXIN OS Setup.\r\n" +
                 "Il est supprimé automatiquement après l'installation, ou par « Annuler la préparation »\r\n" +
                 "dans IXIN OS Setup.\r\n", Encoding.UTF8);
+            if (options != null)
+                File.WriteAllText(Path.Combine(dir, OptionsFile), options, new UTF8Encoding(false));   // sans BOM : lu par GRUB
             using (var sha = SHA256.Create())
             {
                 if (!sha.ComputeHash(File.ReadAllBytes(Path.Combine(dir, "grubx64.efi"))).SequenceEqual(sha.ComputeHash(loader)))
@@ -124,8 +142,12 @@ namespace IxinSetup
 
         // ── entrée du firmware ────────────────────────────────────────────────
 
-        /// <summary>Crée l'entrée « IXIN OS Setup » dans le menu de démarrage du firmware.</summary>
-        public static string Create(string description = Description, string path = LoaderPath)
+        /// <summary>
+        /// Crée l'entrée « IXIN OS Setup » dans le menu de démarrage du firmware. Elle démarre la
+        /// partition EFI de Windows, ou celle montée sur <paramref name="deviceLetter"/> si indiquée
+        /// (partition EFI dédiée, ou partition choisie dans les options avancées).
+        /// </summary>
+        public static string Create(string description = Description, string path = LoaderPath, string deviceLetter = null)
         {
             foreach (var old in ParseEntries(Run("bcdedit.exe", "/enum firmware /v", check: false), path)) Delete(old);
             string output = Run("bcdedit.exe", $"/copy {{bootmgr}} /d \"{description}\"");
@@ -135,6 +157,8 @@ namespace IxinSetup
             try
             {
                 Run("bcdedit.exe", $"/set {id} path {path}");
+                if (!string.IsNullOrEmpty(deviceLetter))
+                    Run("bcdedit.exe", $"/set {id} device partition={deviceLetter}:");
                 Run("bcdedit.exe", $"/set {{fwbootmgr}} displayorder {id} /addlast");
             }
             catch

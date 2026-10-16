@@ -16,20 +16,37 @@ namespace IxinSetup
         private const string PowerKey = @"SYSTEM\CurrentControlSet\Control\Session Manager\Power";
         private const string TimeKey = @"SYSTEM\CurrentControlSet\Control\TimeZoneInformation";
 
-        public static void Apply(SetupState st)
+        public static void Apply(SetupState st, SetupOptions options)
         {
-            st.PreviousHiberboot = ReadDword(PowerKey, "HiberbootEnabled");
-            st.PreviousRtcUtc = ReadDword(TimeKey, "RealTimeIsUniversal");
-            WriteDword(PowerKey, "HiberbootEnabled", 0);
-            WriteDword(TimeKey, "RealTimeIsUniversal", 1);
-            Log.Info($"Démarrage rapide désactivé (avant : {st.PreviousHiberboot?.ToString() ?? "absent"}), " +
-                     $"horloge en UTC (avant : {st.PreviousRtcUtc?.ToString() ?? "absent"})");
+            st.FastStartupChanged = options.DisableFastStartup;
+            st.ClockChanged = options.UtcClock;
+            if (options.DisableFastStartup)
+            {
+                st.PreviousHiberboot = ReadDword(PowerKey, "HiberbootEnabled");
+                WriteDword(PowerKey, "HiberbootEnabled", 0);
+                Log.Info($"Démarrage rapide désactivé (avant : {st.PreviousHiberboot?.ToString() ?? "absent"})");
+            }
+            else
+            {
+                Log.Info("Démarrage rapide de Windows laissé tel quel (option avancée)");
+            }
+            if (options.UtcClock)
+            {
+                st.PreviousRtcUtc = ReadDword(TimeKey, "RealTimeIsUniversal");
+                WriteDword(TimeKey, "RealTimeIsUniversal", 1);
+                Log.Info($"Horloge matérielle en UTC (avant : {st.PreviousRtcUtc?.ToString() ?? "absent"})");
+            }
+            else
+            {
+                Log.Info("Horloge matérielle laissée telle quelle (option avancée)");
+            }
         }
 
+        /// <summary>Rétablit les réglages modifiés (tous, pour un fichier d'état d'une version précédente).</summary>
         public static void Restore(SetupState st)
         {
-            Restore(PowerKey, "HiberbootEnabled", st.PreviousHiberboot);
-            Restore(TimeKey, "RealTimeIsUniversal", st.PreviousRtcUtc);
+            if (st.FastStartupChanged != false) Restore(PowerKey, "HiberbootEnabled", st.PreviousHiberboot);
+            if (st.ClockChanged != false) Restore(TimeKey, "RealTimeIsUniversal", st.PreviousRtcUtc);
             Log.Info("Réglages de Windows rétablis");
         }
 

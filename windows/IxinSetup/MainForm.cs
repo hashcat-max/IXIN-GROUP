@@ -31,6 +31,7 @@ namespace IxinSetup
         private long ixinSize = Plan.DefaultIxin;
         private bool useLocalIso;
         private string localIsoPath;
+        private readonly SetupOptions options = new SetupOptions();   // options avancées
         private bool keySaved;
         private CancellationTokenSource running;
 
@@ -177,14 +178,16 @@ namespace IxinSetup
                                          "Au démarrage du PC, un menu permettra de choisir IXIN OS ou Windows.", null, Theme.Muted));
             var checks = Plan.Checks(facts, state);
             foreach (var c in checks) col.Controls.Add(CheckRow(c));
-            bool blocked = checks.Any(c => c.Level == CheckLevel.Blocking);
-            var buttons = new List<Button>
-            {
-                Action("Continuer", ShowOptions, primary: true, enabled: !blocked),
-                Action("Quitter", Close),
-                Action("Aide", () => Open(HelpUrl)),
-            };
-            if (checks.Any(c => c.UnmovableFiles))
+            var blocking = checks.Where(c => c.Level == CheckLevel.Blocking).ToList();
+            var buttons = new List<Button>();
+            // Seul blocage : des fichiers système en fin de disque. Le bouton principal le règle.
+            if (blocking.Count > 0 && blocking.All(c => c.UnmovableFiles))
+                buttons.Add(Action("Débloquer la réduction", async () => await UnblockShrink(), primary: true));
+            else
+                buttons.Add(Action("Continuer", ShowOptions, primary: true, enabled: blocking.Count == 0));
+            buttons.Add(Action("Quitter", Close));
+            buttons.Add(Action("Aide", () => Open(HelpUrl)));
+            if (blocking.Count > 0 && !blocking.All(c => c.UnmovableFiles) && checks.Any(c => c.UnmovableFiles))
                 buttons.Insert(1, Action("Débloquer la réduction", async () => await UnblockShrink()));
             ShowPage(col, buttons.ToArray());
         }
@@ -236,7 +239,7 @@ namespace IxinSetup
             return row;
         }
 
-        // ── 2. taille et source de l'ISO ──────────────────────────────────────
+        // ── 2. taille (et options avancées) ───────────────────────────────────
 
         private void ShowOptions()
         {
@@ -245,14 +248,6 @@ namespace IxinSetup
             var sizeLabel = Theme.Label("", Theme.Subtitle, Theme.Accent);
             var info = Theme.Label("", Theme.Small, Theme.Muted);
             var bar = new TrackBar { Width = 660, TickStyle = TickStyle.None, BackColor = Theme.Background, SmallChange = 1, LargeChange = 10 };
-
-            var download = new RadioButton { Text = "Télécharger la dernière version d'IXIN OS (recommandé, environ 5 Go)", AutoSize = true, Checked = !useLocalIso, ForeColor = Theme.Text, Margin = new Padding(0, 14, 0, 4) };
-            var local = new RadioButton { Text = "Utiliser une ISO d'IXIN OS déjà téléchargée", AutoSize = true, Checked = useLocalIso, ForeColor = Theme.Text };
-            var pathBox = new TextBox { Width = 540, ReadOnly = true, Text = localIsoPath ?? "", BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
-            var browse = Theme.Button("Parcourir…");
-            var pathRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(20, 0, 0, 0) };
-            pathRow.Controls.Add(pathBox);
-            pathRow.Controls.Add(browse);
             Button next = null;
 
             void Refresh()
@@ -267,43 +262,198 @@ namespace IxinSetup
                 sizeLabel.Text = $"IXIN OS : {bar.Value} Go";
                 info.Text = $"Windows ({facts.DriveLetter}:) gardera {Facts.Gb(facts.Size - shrink)}, dont environ {Facts.Gb(facts.Free - shrink)} d'espace libre. " +
                             $"Maximum possible pour IXIN OS : {maxG} Go. Conseil : 80 Go ou plus pour les jeux.";
-                pathRow.Enabled = useLocalIso;
                 if (next != null) next.Enabled = max >= Plan.MinIxin && (!useLocalIso || File.Exists(localIsoPath ?? ""));
             }
 
             bar.Scroll += (s, e) => { ixinSize = bar.Value * Plan.GiB; Refresh(); };
-            download.CheckedChanged += (s, e) => { useLocalIso = !download.Checked; Refresh(); };
-            browse.Click += (s, e) =>
-            {
-                using (var dlg = new OpenFileDialog { Filter = "Image ISO d'IXIN OS (*.iso)|*.iso", Title = "Choisir l'ISO d'IXIN OS" })
-                {
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        localIsoPath = dlg.FileName;
-                        pathBox.Text = localIsoPath;
-                        local.Checked = true;
-                        Refresh();
-                    }
-                }
-            };
 
             col.Controls.Add(Theme.Label("Choisissez la place réservée à IXIN OS sur le disque. Le reste demeure à Windows.", null, Theme.Muted));
             col.Controls.Add(sizeLabel);
             col.Controls.Add(bar);
             col.Controls.Add(info);
             col.Controls.Add(Theme.Label("Programme d'installation", Theme.Subtitle));
-            col.Controls.Add(download);
-            col.Controls.Add(local);
-            col.Controls.Add(pathRow);
-            col.Controls.Add(Theme.Label("L'ISO est toujours vérifiée (empreinte SHA-256 publiée par IXIN) avant d'être utilisée.", Theme.Small, Theme.Muted));
+            col.Controls.Add(Theme.Label(useLocalIso
+                ? "ISO choisie : " + localIsoPath + " (vérifiée avant d'être utilisée)."
+                : "IXIN OS sera téléchargé (environ 5 Go), puis vérifié automatiquement (empreinte SHA-256 publiée par IXIN)."));
+            var custom = AdvancedSummary();
+            if (custom.Count > 0)
+            {
+                col.Controls.Add(Theme.Label("Options avancées choisies", Theme.Subtitle));
+                foreach (var line in custom) col.Controls.Add(Theme.Label("•  " + line, Theme.Small, Theme.Text));
+            }
+            col.Controls.Add(Theme.Label("Utilisateurs avertis : « Options avancées » permet de choisir la taille exacte, la partition de démarrage (EFI), " +
+                                         "une ISO déjà téléchargée et les réglages de Windows.", Theme.Small, Theme.Muted));
 
             next = Action("Continuer", () =>
             {
                 if (facts.BitLocker.Encrypted) ShowBitLocker();
                 else ShowConfirm();
             }, primary: true);
-            ShowPage(col, next, Action("Retour", ShowChecks));
+            ShowPage(col, next, Action("Retour", ShowChecks), Action("Options avancées…", ShowAdvanced));
             Refresh();
+        }
+
+        /// <summary>Options avancées qui diffèrent du parcours par défaut, en clair.</summary>
+        private List<string> AdvancedSummary()
+        {
+            var lines = new List<string>();
+            if (options.Esp == SetupOptions.NewEsp)
+                lines.Add($"Partition de démarrage (EFI) dédiée à IXIN OS ({Facts.Mb(Plan.NewEspSize)}).");
+            else if (options.Esp != null)
+            {
+                var e = facts.Esps.FirstOrDefault(x => string.Equals(x.Guid, options.Esp, StringComparison.OrdinalIgnoreCase));
+                lines.Add("Partition de démarrage (EFI) : " + (e != null ? e.Describe() : options.Esp) + ".");
+            }
+            if (options.KeepSetupPartition) lines.Add("La partition IXIN-SETUP sera gardée après l'installation.");
+            if (!options.DisableFastStartup) lines.Add("Le démarrage rapide de Windows reste activé.");
+            if (!options.UtcClock) lines.Add("L'horloge matérielle n'est pas réglée en UTC.");
+            return lines;
+        }
+
+        private static string EspSummary(EspChoice c)
+        {
+            if (c.Mode == EspMode.Create) return $"une partition EFI de {Facts.Mb(Plan.NewEspSize)} sera créée ({c.Why})";
+            return (c.Mode == EspMode.Windows ? "partition EFI de Windows, " : "partition EFI ") + c.Esp.Describe();
+        }
+
+        // ── options avancées (utilisateurs avertis) ───────────────────────────
+
+        private void ShowAdvanced()
+        {
+            var col = Theme.Column();
+            col.Controls.Add(Theme.Label("Options avancées", Theme.Title));
+            col.Controls.Add(Theme.Label("Pour les utilisateurs avertis : les réglages par défaut conviennent à presque tous les PC.", null, Theme.Muted));
+            Label Section(string text)
+            {
+                var l = Theme.Label(text, Theme.Subtitle);
+                l.Margin = new Padding(0, 12, 0, 4);
+                return l;
+            }
+            FlowLayoutPanel Row(params Control[] controls)
+            {
+                var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 4), BackColor = Theme.Background };
+                row.Controls.AddRange(controls);
+                return row;
+            }
+
+            // taille exacte
+            bool local = useLocalIso;
+            string isoPath = localIsoPath;
+            var size = new NumericUpDown { Width = 90, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Font = Theme.Body };
+            var sizeHelp = Theme.Label("", Theme.Small, Theme.Muted);
+            sizeHelp.Margin = new Padding(8, 6, 0, 0);
+            void SizeRange()
+            {
+                long max = Plan.MaxIxin(facts, Plan.DefaultIsoSize, isoOnWindows: !local);
+                int minG = (int)(Plan.MinIxin / Plan.GiB), maxG = (int)Math.Max(minG, max / Plan.GiB);
+                size.Minimum = minG;
+                size.Maximum = maxG;
+                size.Value = Math.Max(minG, Math.Min(maxG, ixinSize / Plan.GiB));
+                sizeHelp.Text = $"Go pour IXIN OS (de {minG} à {maxG} Go ; 80 Go ou plus conseillés pour les jeux)";
+            }
+            SizeRange();
+            col.Controls.Add(Section("Taille"));
+            col.Controls.Add(Row(size, sizeHelp));
+
+            // partition EFI
+            var auto = Plan.ChooseEsp(facts);
+            var espValues = new List<string> { null };
+            var espBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 660, FlatStyle = FlatStyle.Flat, BackColor = Theme.Card, ForeColor = Theme.Text };
+            espBox.Items.Add("Automatique (recommandé)");
+            foreach (var e in facts.Esps.Where(e => e.IsFat))
+            {
+                espBox.Items.Add("Partition EFI existante : " + e.Describe() + (e.IsSystem ? " (celle de Windows)" : ""));
+                espValues.Add(e.Guid);
+            }
+            espBox.Items.Add($"Créer une partition EFI dédiée à IXIN OS ({Facts.Mb(Plan.NewEspSize)})");
+            espValues.Add(SetupOptions.NewEsp);
+            espBox.SelectedIndex = Math.Max(0, espValues.IndexOf(options.Esp));
+            var espHelp = Theme.Label("", Theme.Small, Theme.Muted);
+            espBox.SelectedIndexChanged += (s, e) => EspHelp();
+            void EspHelp()
+            {
+                string v = espValues[Math.Max(0, espBox.SelectedIndex)];
+                espHelp.Text = v == null ? "Choix d'IXIN OS Setup pour ce PC : " + EspSummary(auto) + "."
+                    : v == SetupOptions.NewEsp ? $"Une partition FAT32 de {Facts.Mb(Plan.NewEspSize)} est créée sur l'espace d'IXIN OS : la partition EFI de Windows n'est pas modifiée."
+                    : "IXIN OS Setup, puis IXIN OS, y ajoutent leur chargeur de démarrage (quelques Mo) à côté de ceux déjà présents.";
+            }
+            EspHelp();
+            col.Controls.Add(Section("Partition de démarrage (EFI)"));
+            col.Controls.Add(espBox);
+            col.Controls.Add(espHelp);
+
+            // programme d'installation
+            var download = new RadioButton { Text = "Télécharger la dernière version d'IXIN OS (recommandé)", AutoSize = true, Checked = !local, ForeColor = Theme.Text };
+            var useIso = new RadioButton { Text = "Utiliser une ISO d'IXIN OS déjà téléchargée", AutoSize = true, Checked = local, ForeColor = Theme.Text };
+            var pathBox = new TextBox { Width = 540, ReadOnly = true, Text = isoPath ?? "", BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
+            var browse = Theme.Button("Parcourir…");
+            var pathRow = Row(pathBox, browse);
+            pathRow.Margin = new Padding(20, 0, 0, 0);
+            col.Controls.Add(Section("Programme d'installation"));
+            col.Controls.Add(download);
+            col.Controls.Add(useIso);
+            col.Controls.Add(pathRow);
+            col.Controls.Add(Theme.Label("Le fichier .sha256 publié avec l'ISO doit se trouver dans le même dossier : l'ISO est toujours vérifiée.", Theme.Small, Theme.Muted));
+
+            // après l'installation
+            var keep = new CheckBox { Text = "Garder la partition IXIN-SETUP après l'installation", AutoSize = true, Checked = options.KeepSetupPartition, ForeColor = Theme.Text };
+            col.Controls.Add(Section("Après l'installation"));
+            col.Controls.Add(keep);
+            col.Controls.Add(Theme.Label("Pour réinstaller ou tester IXIN OS sans retélécharger : « IXIN OS Setup » reste dans le menu de démarrage du PC.", Theme.Small, Theme.Muted));
+
+            // réglages de Windows
+            var fast = new CheckBox { Text = "Désactiver le démarrage rapide de Windows (recommandé)", AutoSize = true, Checked = options.DisableFastStartup, ForeColor = Theme.Text };
+            var utc = new CheckBox { Text = "Régler l'horloge matérielle en UTC, comme IXIN OS (recommandé)", AutoSize = true, Checked = options.UtcClock, ForeColor = Theme.Text };
+            col.Controls.Add(Section("Réglages de Windows pour le double démarrage"));
+            col.Controls.Add(fast);
+            col.Controls.Add(Theme.Label("Sinon Windows ne s'éteint pas complètement et IXIN OS ne peut pas écrire sur ses disques.", Theme.Small, Theme.Muted));
+            col.Controls.Add(utc);
+            col.Controls.Add(Theme.Label("Sinon l'heure de Windows se décale après chaque passage sous IXIN OS.", Theme.Small, Theme.Muted));
+
+            Button ok = null;
+            void Validate()
+            {
+                pathRow.Enabled = local;
+                if (ok != null) ok.Enabled = !local || File.Exists(isoPath ?? "");
+            }
+            download.CheckedChanged += (s, e) => { local = !download.Checked; SizeRange(); Validate(); };
+            browse.Click += (s, e) =>
+            {
+                using (var dlg = new OpenFileDialog { Filter = "Image ISO d'IXIN OS (*.iso)|*.iso", Title = "Choisir l'ISO d'IXIN OS" })
+                {
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        isoPath = dlg.FileName;
+                        pathBox.Text = isoPath;
+                        useIso.Checked = true;
+                        Validate();
+                    }
+                }
+            };
+
+            ok = Action("Valider", () =>
+            {
+                useLocalIso = local;
+                localIsoPath = isoPath;
+                ixinSize = (long)size.Value * Plan.GiB;
+                options.Esp = espValues[Math.Max(0, espBox.SelectedIndex)];
+                options.KeepSetupPartition = keep.Checked;
+                options.DisableFastStartup = fast.Checked;
+                options.UtcClock = utc.Checked;
+                Log.Info("Options avancées : " + (AdvancedSummary().Count == 0 ? "par défaut" : string.Join(" ", AdvancedSummary())));
+                ShowOptions();
+            }, primary: true);
+            ShowPage(col, ok, Action("Annuler", ShowOptions), Action("Valeurs par défaut", () =>
+            {
+                useLocalIso = false;
+                options.Esp = null;
+                options.KeepSetupPartition = false;
+                options.DisableFastStartup = true;
+                options.UtcClock = true;
+                ixinSize = Plan.DefaultIxin;
+                ShowAdvanced();
+            }));
+            Validate();
         }
 
         // ── 3. clé de récupération BitLocker ──────────────────────────────────
@@ -405,10 +555,23 @@ namespace IxinSetup
             col.Controls.Add(Theme.Label("Vérifiez avant de commencer", Theme.Title));
             void Item(string text) => col.Controls.Add(Theme.Label("•  " + text));
             Item($"Windows ({facts.DriveLetter}:) sera réduit de {Facts.Gb(shrink)} : il gardera {Facts.Gb(facts.Size - shrink)}. Aucun fichier n'est supprimé.");
-            Item($"{Facts.Gb(ixinSize)} resteront libres pour IXIN OS, et une partition « IXIN-SETUP » d'environ {Facts.Gb(setup)} recevra le programme d'installation (supprimée automatiquement ensuite).");
+            Item($"{Facts.Gb(ixinSize)} resteront libres pour IXIN OS, et une partition « IXIN-SETUP » d'environ {Facts.Gb(setup)} recevra le programme d'installation " +
+                 (options.KeepSetupPartition ? "(gardée après l'installation : option avancée)." : "(supprimée automatiquement ensuite)."));
+            var esp = Plan.ChooseEsp(facts, options.Esp);
+            if (esp.Mode == EspMode.Create)
+                Item($"Une partition de démarrage (EFI) de {Facts.Mb(Plan.NewEspSize)} sera créée pour IXIN OS, prise sur son espace ({esp.Why}).");
+            else if (esp.Esp.Disk != facts.DiskNumber)
+                Item($"Le chargeur de démarrage ira dans la partition EFI de Windows, sur le disque {esp.Esp.Disk} : ne retirez pas ce disque.");
             Item(useLocalIso ? "L'ISO choisie sera vérifiée puis copiée." : "IXIN OS sera téléchargé (environ 5 Go) puis vérifié : comptez quelques minutes à une heure selon votre connexion.");
             Item("« IXIN OS Setup » sera ajouté au menu de démarrage du PC (Windows reste le choix par défaut).");
-            Item("Le démarrage rapide de Windows sera désactivé et l'horloge réglée en UTC (recommandé pour le double démarrage).");
+            if (options.DisableFastStartup && options.UtcClock)
+                Item("Le démarrage rapide de Windows sera désactivé et l'horloge réglée en UTC (recommandé pour le double démarrage).");
+            else if (options.DisableFastStartup)
+                Item("Le démarrage rapide de Windows sera désactivé (horloge inchangée : option avancée).");
+            else if (options.UtcClock)
+                Item("L'horloge sera réglée en UTC (démarrage rapide de Windows inchangé : option avancée).");
+            else
+                Item("Les réglages de Windows ne sont pas modifiés (options avancées).");
             if (facts.BitLocker.ProtectionOn) Item("BitLocker sera suspendu pendant 3 démarrages, puis se réactivera tout seul.");
             if (facts.SecureBoot == true) Item("Secure Boot devra ensuite être désactivé dans les paramètres UEFI (expliqué à l'étape suivante).");
             col.Controls.Add(Theme.Label("Tout peut être annulé : « Annuler la préparation » dans IXIN OS Setup rend l'espace à Windows.", Theme.Small, Theme.Muted));
@@ -514,7 +677,7 @@ namespace IxinSetup
                     if (max < Plan.MinIxin)
                         throw new SetupException("Il n'y a plus assez d'espace libre sur Windows pour IXIN OS.");
                     long size = Math.Min(ixinSize, max);
-                    var result = Installer.Prepare(fresh, size, iso, sha, step, transfer, ct);
+                    var result = Installer.Prepare(fresh, size, iso, sha, options, step, transfer, ct);
                     if (!useLocalIso)
                     {
                         try { File.Delete(iso); } catch (IOException) { }
@@ -643,7 +806,13 @@ namespace IxinSetup
             col.Controls.Add(Theme.Label("IXIN OS est installé", Theme.Title, Theme.Accent));
             col.Controls.Add(Theme.Label("Au démarrage du PC, le menu IXIN permet de choisir IXIN OS ou Windows."));
             var buttons = new List<Button>();
-            if (setupLeft)
+            if (setupLeft && state?.KeepSetupPartition == true)
+            {
+                col.Controls.Add(Theme.Label("La partition d'installation IXIN-SETUP est gardée (option avancée) : « IXIN OS Setup » reste " +
+                                             "dans le menu de démarrage du PC pour réinstaller IXIN OS.", null, Theme.Muted));
+                buttons.Add(Action("Supprimer IXIN-SETUP", async () => await RunRemoveSetup(), primary: true));
+            }
+            else if (setupLeft)
             {
                 col.Controls.Add(Theme.Label("La partition d'installation (IXIN-SETUP) sera supprimée au premier démarrage d'IXIN OS ; " +
                                              "relancez ensuite IXIN OS Setup pour rendre cet espace à Windows.", null, Theme.Muted));
@@ -699,6 +868,9 @@ namespace IxinSetup
                 case "espace":
                     ShowOptions();
                     break;
+                case "avancees":
+                    ShowAdvanced();
+                    break;
                 case "bitlocker":
                     ShowBitLockerKeys(sampleKeys ?? new List<RecoveryKey>());
                     break;
@@ -750,6 +922,25 @@ namespace IxinSetup
                 await Task.Run(() => Installer.Undo(state, step));
                 state = null;
                 ShowMessage("Préparation annulée", "Windows est dans son état d'origine : l'espace a été rendu et le menu de démarrage retiré.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.ToString());
+                ShowError(ex.Message);
+            }
+        }
+
+        private async Task RunRemoveSetup()
+        {
+            if (MessageBox.Show("Supprimer la partition IXIN-SETUP et l'entrée « IXIN OS Setup » du menu de démarrage, " +
+                                "puis rendre cet espace à Windows ? IXIN OS n'est pas modifié.",
+                    "IXIN OS Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            ShowPage(Busy("Suppression de la partition d'installation…", "IXIN OS et Windows ne sont pas modifiés."));
+            try
+            {
+                await Task.Run(() => Installer.RemoveSetupAfterInstall(state, new Progress<string>(s => Log.Info(s))));
+                state = null;
+                ShowMessage("C'est fait", "La partition IXIN-SETUP a été supprimée et son espace rendu à Windows.");
             }
             catch (Exception ex)
             {

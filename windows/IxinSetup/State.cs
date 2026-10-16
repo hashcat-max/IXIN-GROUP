@@ -28,6 +28,15 @@ namespace IxinSetup
         public bool BitLockerSuspended { get; set; }
         public int? PreviousHiberboot { get; set; }     // démarrage rapide de Windows avant modification
         public int? PreviousRtcUtc { get; set; }        // horloge matérielle en UTC avant modification
+        public bool? FastStartupChanged { get; set; }   // null : fichier d'une version précédente (réglage modifié)
+        public bool? ClockChanged { get; set; }
+        public string EspMode { get; set; }             // partition EFI du chargeur : Windows, Existing, Create
+        public string EspGuid { get; set; }
+        public int EspDisk { get; set; } = -1;
+        public int EspNumber { get; set; }
+        public string EspVolumePath { get; set; }
+        public bool EspCreated { get; set; }            // partition EFI créée par IXIN OS Setup
+        public bool KeepSetupPartition { get; set; }    // IXIN-SETUP gardée après l'installation (option avancée)
         public bool Completed { get; set; }
 
         private static string FilePath => Path.Combine(Log.Directory, "setup-state.json");
