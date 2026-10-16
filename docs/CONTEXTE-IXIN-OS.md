@@ -4,8 +4,8 @@
 > **os.ixin.online** (presentation, downloads, documentation). Everything stated here exists and has been
 > tested, unless explicitly marked otherwise. **Please do not invent features that are not listed here.**
 >
-> **Last update: October 15, 2026 (evening) — current release `build-2026.10.15-3`** (new: §3 screenshots of the whole
-> "install from Windows" journey, §9 fixes coming with the next build).
+> **Last update: October 16, 2026 — current release `build-2026.10.15-3`** (new: §3 screenshots of the whole
+> "install from Windows" journey, §4 update server live on GitHub Pages, §9 fixes coming with the next build).
 > Companion file (French, ready to adapt into a page): `docs/INSTALLATION-WINDOWS.md`, the complete
 > "Installer IXIN OS à côté de Windows" user guide.
 
@@ -173,14 +173,25 @@ An in-house graphical application that opens on first login. 5 tabs:
   block a faulty update, or send a message to all PCs — all **cryptographically signed** (no third party can impersonate IXIN).
 - Where updates come from (for a transparency / FAQ section):
   - IXIN packages and the IXIN policy are published by GitHub Actions on **GitHub Pages**
-    (`https://hashcat-max.github.io/IXIN-GROUP/repo`) with a fallback copy on the `ixin-repo` branch of the repository;
+    (`https://hashcat-max.github.io/IXIN-GROUP/repo`, live since October 16, 2026) with a fallback copy on the
+    `ixin-repo` branch of the repository;
   - every package, the package database and the policy are **signed with the IXIN key**; PCs refuse anything unsigned.
     Fingerprint to publish on the site: **`74DF FA0C 6B29 1E07 27EA  8A59 891C 90DD 6094 ABDF`**
     ("IXIN OS Updates (équipe IXIN)");
   - Arch Linux packages come from the official Arch mirrors, signed by Arch Linux.
-- Optional idea for the site: the signed policy file `…/repo/policy.json` is public JSON (`issued`, `expires`,
-  `urgent`, `notice`); a small "état des mises à jour" widget could show the date of the latest IXIN publication and
-  any current announcement.
+- Optional idea for the site: a small **"État des mises à jour"** widget. The signed IXIN policy is public JSON that a
+  browser can fetch directly (GitHub Pages sends `Access-Control-Allow-Origin: *`; cached 10 minutes):
+  `https://hashcat-max.github.io/IXIN-GROUP/repo/policy.json`. Useful fields:
+  - `issued` / `expires`: ISO 8601 UTC dates. `issued` is when the policy was last **signed** — at every IXIN
+    publication and automatically every Monday (valid 14 days) — not the date of the latest package, so label it
+    e.g. "Service de mises à jour vérifié le …", not "dernière mise à jour";
+  - `urgent`: `true` while the IXIN team is pushing an urgent fix;
+  - `notice`: `null`, or the announcement currently shown on every PC: `{"level": "info" | "critical", "text": "…"}`
+    (the PCs display at most 500 characters; show it the same way, "critical" as an alert);
+  - other fields (`version`, `serial`, `hold`, `news_ack`) are internal.
+  Example (October 16, 2026): `{"urgent": false, "hold": [], "news_ack": [], "notice": null, "version": 1,
+  "serial": 1792117820, "issued": "2026-10-16T02:30:20Z", "expires": "2026-10-30T02:30:20Z"}`.
+  If the request fails, simply hide the widget.
 
 ### Privacy and tools
 Tor Browser, Tor + torsocks, Signal, KeePassXC, VeraCrypt, GnuPG + Kleopatra, mat2 / Metadata Cleaner,
