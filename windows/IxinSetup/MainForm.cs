@@ -358,7 +358,7 @@ namespace IxinSetup
             // partition EFI
             var auto = Plan.ChooseEsp(facts);
             var espValues = new List<string> { null };
-            var espBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 660, FlatStyle = FlatStyle.Flat, BackColor = Theme.Card, ForeColor = Theme.Text };
+            var espBox = Theme.ComboBox(660);
             espBox.Items.Add("Automatique (recommandé)");
             foreach (var e in facts.Esps.Where(e => e.IsFat))
             {

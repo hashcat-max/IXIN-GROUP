@@ -57,6 +57,32 @@ namespace IxinSetup
             return b;
         }
 
+        /// <summary>Liste déroulante aux couleurs d'IXIN (dessinée par le programme : Windows la laisse en blanc).</summary>
+        public static ComboBox ComboBox(int width)
+        {
+            var box = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                DrawMode = DrawMode.OwnerDrawFixed,
+                FlatStyle = FlatStyle.Flat,
+                Width = width,
+                ItemHeight = 22,
+                BackColor = Card,
+                ForeColor = Text,
+                Font = Body,
+            };
+            box.DrawItem += (s, e) =>
+            {
+                if (e.Index < 0) return;
+                bool highlighted = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0;
+                using (var back = new SolidBrush(highlighted ? Color.FromArgb(22, 64, 50) : Card))
+                    e.Graphics.FillRectangle(back, e.Bounds);
+                TextRenderer.DrawText(e.Graphics, box.Items[e.Index].ToString(), box.Font, e.Bounds, Text,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            };
+            return box;
+        }
+
         public static FlowLayoutPanel Column()
         {
             return new FlowLayoutPanel
