@@ -92,7 +92,9 @@ BitLocker on, Secure Boot on. Nothing is real: the BitLocker key shown is fake. 
 1. `ixin-os-setup-1-analyse.png`: "Analyse du PC…"
 2. `ixin-os-setup-2-verification.png`: check of the PC (✔ compatible UEFI PC, ✔ GPT disk, ✔ space available,
    ⚠ Secure Boot on, ⚠ Windows encrypted with BitLocker)
-3. `ixin-os-setup-3-espace.png`: choosing the space for IXIN OS (slider, 80 GB) and the download
+3. `ixin-os-setup-3-espace.png`: choosing the space for IXIN OS (slider, 80 GB) — the only choice for beginners
+   - `ixin-os-setup-3b-options-avancees.png`: the "Options avancées" page for experienced users (exact size,
+     EFI partition, ISO already downloaded, keep IXIN-SETUP, Windows settings)
 4. `ixin-os-setup-4-cle-bitlocker.png`: the BitLocker recovery key to note (button greyed until confirmed)
 5. `ixin-os-setup-5-confirmation.png`: "Vérifiez avant de commencer", the full list of what will be changed
 6. `ixin-os-setup-6-preparation.png`: preparation in progress (download of IXIN OS)
@@ -101,6 +103,8 @@ BitLocker on, Secure Boot on. Nothing is real: the BitLocker key shown is fake. 
 9. `ixin-os-setup-9-installation-prete.png`: the program reopened before installing ("Annuler la préparation")
 10. `ixin-os-setup-10-ixin-installe.png`: the program reopened once IXIN OS is installed ("Rendre 6 Go à Windows",
     "Remettre le menu IXIN au démarrage")
+- `ixin-os-setup-efi-autre-disque.png`: check of a PC whose EFI partition is on another disk — shown as information,
+  not blocking (such PCs used to be refused).
 - `ixin-os-setup-reduction-bloquee.png`: a blocking check ("C: ne peut pas être réduit assez") with the
   "Débloquer la réduction" button — for a troubleshooting section.
 
