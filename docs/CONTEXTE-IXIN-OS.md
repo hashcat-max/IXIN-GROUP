@@ -227,30 +227,44 @@ Requirements (both): 64-bit (x86_64) PC, **UEFI** recommended (legacy BIOS works
 - What the user does:
   1. download and run `IXIN-OS-Setup.exe` (Windows asks for administrator rights: "Oui");
   2. **check of the PC**: each point is explained (✔ ok, ⚠ good to know, ✖ blocking);
-  3. **choose the space** for IXIN OS (slider); IXIN OS is downloaded automatically (≈5 GB) and its SHA-256 is
-     verified — or an ISO already downloaded can be used;
+  3. **choose the space** for IXIN OS (slider, the only choice on this page); IXIN OS is downloaded automatically
+     (≈5 GB) and its SHA-256 is verified. An **"Options avancées…"** button (for experienced users, screenshot
+     `ixin-os-setup-3b-options-avancees.png`) gives: exact size, which EFI (boot) partition to use — automatic,
+     an existing one, or a new one dedicated to IXIN OS (300 MB, Windows' own left untouched) —, an ISO already
+     downloaded, keeping the IXIN-SETUP partition after installation (to reinstall without downloading again),
+     and the two Windows settings (Fast Startup, UTC clock). Defaults suit nearly every PC;
   4. if Windows is encrypted (**BitLocker** / device encryption): the **recovery key** is shown and can be saved to a
      file; the user confirms having noted it;
   5. confirmation, then **preparation**: Windows is shrunk, a 6 GB "IXIN-SETUP" partition receives the verified ISO,
      an "IXIN OS Setup" entry is added to the boot menu (Windows stays the default);
   6. **restart**: straight into the installer, or first into the UEFI settings if **Secure Boot** must be turned off;
   7. in the IXIN OS live system, a welcome window explains the single choice to make: at the **"Partitions"** step,
-     "Remplacer une partition" is preselected → click the grey **"Espace libre"** zone → tick **"Chiffrer le système"**
-     (recommended). In this mode the disk cannot be erased and Windows partitions cannot be selected
-     (screenshots `depuis-windows-guide.png`, `depuis-windows-partitions.png`);
+     the disk and the free space prepared by IXIN OS Setup are **already selected** (even on a PC with several
+     disks), as is the right EFI partition → just tick **"Chiffrer le système"** (recommended) and continue. In this
+     mode the disk cannot be erased and Windows partitions cannot be selected; experienced users can still pick
+     "Partitionnement manuel" (screenshots `depuis-windows-guide.png`, `depuis-windows-partitions.png`);
   8. finish the installation (name, password), restart: the IXIN menu offers IXIN OS and Windows.
 - On the first start of IXIN OS, the temporary "IXIN-SETUP" partition (6 GB) and the "IXIN OS Setup" menu are
   removed automatically. Running IXIN OS Setup again in Windows then offers **"Rendre 6 Go à Windows"**.
 - **Everything can be undone** until IXIN OS is installed ("Annuler la préparation"); on any error during the
   preparation, Windows is put back automatically in its original state.
+- **EFI (boot) partition, handled automatically**: IXIN OS Setup looks at every disk and uses the EFI partition Windows
+  starts from, even when it is on another disk (common on PCs installed with two disks plugged in — such PCs used to be
+  refused with "Partition EFI introuvable"). If there is no usable one (none, almost full, or on a USB disk), it
+  **creates a dedicated 300 MB EFI partition "IXIN-EFI" by itself**, taken from IXIN OS's space. The IXIN OS
+  installer then picks that same partition automatically.
 - Extra help built into the program: **"Débloquer la réduction"** (when Windows cannot be shrunk because of system
-  files: hibernation file, page file), **"Remettre le menu IXIN au démarrage"** (if a Windows update put Windows first
-  in the boot order); it recognises a PC where IXIN OS is already installed.
+  files: hibernation file, page file — it becomes the main button when it is the only problem), **"Remettre le menu
+  IXIN au démarrage"** (if a Windows update put Windows first in the boot order); it recognises a PC where IXIN OS is
+  already installed.
 - What it changes on the PC (all reversible before installation): Windows partition shrunk; exFAT "IXIN-SETUP"
-  partition without a drive letter; `\EFI\IXIN-SETUP\` boot loader (3 MB) in the Windows EFI partition; "IXIN OS
-  Setup" firmware boot entry; Windows Fast Startup turned off and hardware clock set to UTC (needed for dual boot);
-  BitLocker suspended for 3 restarts (Windows re-enables it by itself). Log: `C:\ProgramData\IXIN\setup.log`.
-- Not supported: BIOS (legacy) or MBR disk → use a USB stick; IXIN OS goes on the disk where Windows is.
+  partition without a drive letter; `\EFI\IXIN-SETUP\` boot loader (3 MB) + `options.cfg` in the EFI partition;
+  a dedicated "IXIN-EFI" partition (300 MB) only when needed or asked for; "IXIN OS Setup" firmware boot entry;
+  Windows Fast Startup turned off and hardware clock set to UTC (needed for dual boot; both can be kept as they are
+  in the advanced options); BitLocker suspended for 3 restarts (Windows re-enables it by itself).
+  Log: `C:\ProgramData\IXIN\setup.log`.
+- Not supported: BIOS (legacy) or MBR disk → the program explains it and the guide (section 10) walks through a USB
+  stick installation; IXIN OS goes on the disk where Windows is (its EFI partition may be on another disk).
 - The program is open source (`windows/` in the repository) but **not code-signed yet**: Windows SmartScreen
   shows "Windows a protégé votre ordinateur" → "Informations complémentaires" → "Exécuter quand même".
 - Full user guide in French: **`docs/INSTALLATION-WINDOWS.md`** (requirements, step-by-step, Secure Boot,

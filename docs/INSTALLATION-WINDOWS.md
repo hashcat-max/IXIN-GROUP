@@ -6,7 +6,7 @@ fichiers restent en place ; au démarrage du PC, un menu permet ensuite de chois
 ou **Windows**.
 
 > Pour installer IXIN OS seul sur un PC, dans une machine virtuelle, ou si votre PC n'est pas
-> compatible (voir ci-dessous), utilisez l'ISO sur une clé USB (Rufus ou Ventoy).
+> compatible (voir ci-dessous), utilisez l'ISO sur une clé USB : voir la section 10.
 
 ---
 
@@ -15,7 +15,8 @@ ou **Windows**.
 | | |
 |---|---|
 | Windows | Windows 10 ou 11, 64 bits |
-| Démarrage | **UEFI** (cas de presque tous les PC depuis 2012) avec un disque **GPT** |
+| Démarrage | **UEFI** (cas de presque tous les PC depuis 2012) avec un disque **GPT** ; PC en mode BIOS : clé USB (section 10) |
+| Disques | un ou plusieurs : la partition de démarrage (EFI) de Windows peut se trouver sur un autre disque, IXIN OS Setup la trouve (ou en crée une si besoin) |
 | Espace libre sur Windows (C:) | environ **75 Go** : 45 Go minimum pour IXIN OS (80 Go conseillés pour les jeux), 6 Go pour le programme d'installation, 5 Go de téléchargement temporaire, et 20 Go laissés libres à Windows |
 | Alimentation | portable branché sur secteur |
 | Précaution | une **sauvegarde** de vos fichiers importants (aucun fichier n'est supprimé, mais un disque se modifie toujours avec prudence) |
@@ -41,6 +42,14 @@ IXIN OS Setup vérifie tout cela lui-même et explique ce qui bloque.
 
    <img src="screenshots/ixin-os-setup-3-espace.png" alt="IXIN OS Setup : espace pour IXIN OS" width="480">
 
+   **Options avancées** (utilisateurs avertis, bouton « Options avancées… ») : taille exacte, partition de
+   démarrage (EFI) à utiliser — automatique, une partition EFI existante, ou une partition EFI dédiée à
+   IXIN OS (300 Mo, sans toucher à celle de Windows) —, ISO déjà téléchargée, garder la partition
+   IXIN-SETUP après l'installation (pour réinstaller sans retélécharger), démarrage rapide de Windows et
+   horloge UTC. Les valeurs par défaut conviennent à presque tous les PC.
+
+   <img src="screenshots/ixin-os-setup-3b-options-avancees.png" alt="IXIN OS Setup : options avancées" width="480">
+
 4. **BitLocker** (si Windows est chiffré) : votre **clé de récupération** de 48 chiffres est
    affichée ; notez-la ou enregistrez-la **ailleurs que sur ce PC** (clé USB, téléphone, papier).
 
@@ -58,8 +67,9 @@ IXIN OS Setup vérifie tout cela lui-même et explique ce qui bloque.
    <img src="screenshots/depuis-windows-guide.png" alt="Fenêtre d'accueil d'IXIN OS après IXIN OS Setup" width="640">
 
 8. Dans l'installation, à l'étape **« Partitions »** :
-   - **« Remplacer une partition »** est déjà sélectionné ;
-   - cliquez sur la zone grise **« Espace libre »** dans la barre du disque ;
+   - le disque et l'espace préparés par IXIN OS Setup sont déjà sélectionnés (« Remplacer une
+     partition », zone **« Espace libre »**) — sinon, choisissez le disque de Windows en haut puis
+     cliquez sur la zone grise « Espace libre » dans la barre du disque ;
    - cochez **« Chiffrer le système »** et choisissez une phrase secrète (recommandé).
 
    Pour protéger Windows, effacer le disque ou réduire de nouveau Windows est refusé dans ce mode,
@@ -125,6 +135,14 @@ préparation, cette remise en état est automatique.
 
 ## 6. Dépannage
 
+**« Partition de démarrage (EFI) sur un autre disque »** (information, pas une erreur) — sur les PC
+installés avec deux disques branchés, Windows démarre souvent depuis la partition EFI de l'autre disque.
+IXIN OS l'utilise aussi : ne retirez pas ce disque du PC (Windows ne démarrerait plus non plus).
+
+**« Une partition de démarrage (EFI) sera créée pour IXIN OS »** (information) — aucune partition EFI
+utilisable n'a été trouvée (absente, presque pleine, ou sur un disque USB) : IXIN OS Setup crée
+automatiquement une partition EFI de 300 Mo « IXIN-EFI », prise sur l'espace d'IXIN OS.
+
 **« C: ne peut pas être réduit assez »** — Windows a assez d'espace libre, mais des fichiers système
 impossibles à déplacer se trouvent en fin de disque (Windows ne peut pas réduire sa partition au-delà) :
 
@@ -158,9 +176,10 @@ du PC, touches ci-dessus).
 |---|---|
 | Windows (C:) réduit de la taille choisie + 6 Go | « Annuler la préparation » le rend à Windows |
 | Partition exFAT « IXIN-SETUP » (6 Go, sans lettre de lecteur) contenant l'ISO vérifiée | supprimée au premier démarrage d'IXIN OS, ou par « Annuler » |
-| `\EFI\IXIN-SETUP\grubx64.efi` dans la partition EFI de Windows (3 Mo) | idem |
+| `\EFI\IXIN-SETUP\` (chargeur de 3 Mo + `options.cfg`) dans la partition EFI de Windows, ou dans celle choisie | idem |
+| Partition EFI « IXIN-EFI » de 300 Mo, seulement si nécessaire ou demandée (options avancées) | supprimée par « Annuler » ; gardée une fois IXIN OS installé (il démarre avec) |
 | Entrée « IXIN OS Setup » du menu de démarrage du PC (Windows reste le choix par défaut) | idem |
-| Démarrage rapide de Windows désactivé, horloge matérielle en UTC | « Annuler » rétablit les anciennes valeurs |
+| Démarrage rapide de Windows désactivé, horloge matérielle en UTC (modifiables dans les options avancées) | « Annuler » rétablit les anciennes valeurs |
 | BitLocker suspendu 3 démarrages (si actif) | réactivation automatique par Windows |
 
 Journal détaillé : `C:\ProgramData\IXIN\setup.log` ; état : `C:\ProgramData\IXIN\setup-state.json`.
@@ -179,10 +198,33 @@ Journal détaillé : `C:\ProgramData\IXIN\setup.log` ; état : `C:\ProgramData\I
 
 ## 9. Limites connues
 
-- Démarrage BIOS (Legacy) ou disque MBR : non pris en charge, utilisez une clé USB.
-- PC avec plusieurs disques : IXIN OS s'installe sur le disque de Windows.
+- Démarrage BIOS (Legacy) ou disque MBR : non pris en charge par IXIN OS Setup, utilisez une clé USB
+  (section 10).
+- PC avec plusieurs disques : IXIN OS s'installe sur le disque de Windows (la partition EFI, elle, peut
+  être sur un autre disque).
 - Secure Boot : à désactiver (section 3).
 - Testé sur Windows (disque virtuel) et, côté IXIN OS, de bout en bout en machine virtuelle sur un PC
   Windows simulé (menu IXIN OS Setup, installation dans l'espace libre, nettoyage, menu IXIN / Windows) ;
   à valider sur une grande variété de PC réels (firmwares de marques différentes) : signalez tout
   problème avec le fichier `C:\ProgramData\IXIN\setup.log`.
+
+---
+
+## 10. Installer avec une clé USB (PC en mode BIOS, disque MBR, PC sans Windows)
+
+1. Il faut une **clé USB de 8 Go** ou plus : **tout son contenu sera effacé**.
+2. Sur la page des versions, téléchargez les morceaux de l'ISO (`….iso.part00`, `.part01`, `.part02`)
+   dans un même dossier, puis reconstituez l'ISO : dans ce dossier, clic droit → *Ouvrir dans le
+   terminal*, puis tapez la commande indiquée dans les notes de la version
+   (`cmd /c copy /b ….part00+….part01+….part02 ixin-os.iso`).
+3. Téléchargez **Rufus** (rufus.ie), branchez la clé, choisissez-la dans *Périphérique*, cliquez sur
+   *Sélection* pour choisir `ixin-os.iso`, puis *Démarrer*. Si Rufus demande un mode d'écriture,
+   choisissez **« Écrire en mode Image DD »**.
+4. Redémarrez le PC en appuyant sur la touche du **menu de démarrage** (F12 sur Dell et Lenovo, F9 sur HP,
+   F8 sur Asus, F11 sur MSI, Échap ou F12 sur Acer) et choisissez la clé USB.
+5. IXIN OS démarre depuis la clé : double-cliquez sur **« Installer IXIN OS »**. À l'étape
+   « Partitions », **« Installer à côté »** réduit Windows pour faire de la place (glissez le séparateur
+   pour choisir la taille), **« Effacer le disque »** remplace tout le contenu du disque choisi.
+
+Sur un PC en mode BIOS, l'installation à côté de Windows depuis une clé USB est encore peu testée :
+sauvegardez vos fichiers importants avant de commencer.
