@@ -26,7 +26,8 @@ for f in /home/liveuser/Desktop/*.desktop; do gio set "$f" metadata::trusted tru
 systemctl enable NetworkManager.service sddm.service bluetooth.service \
     systemd-resolved.service systemd-timesyncd.service power-profiles-daemon.service \
     apparmor.service ufw.service fstrim.timer paccache.timer reflector.timer \
-    ixin-update.timer ixin-update-bootcheck.service linux-modules-cleanup.service
+    ixin-update.timer ixin-update-bootcheck.service linux-modules-cleanup.service \
+    cups.socket avahi-daemon.service
 systemctl disable iwd.service systemd-networkd.service 2>/dev/null || true
 systemctl set-default graphical.target
 
@@ -43,6 +44,14 @@ EOF
 # ── Pare-feu : tout refuser en entrée, tout autoriser en sortie ──
 sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
 sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/; s/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="DROP"/; s/^DEFAULT_OUTPUT_POLICY=.*/DEFAULT_OUTPUT_POLICY="ACCEPT"/; s/^IPV6=.*/IPV6=yes/' /etc/default/ufw
+
+# ── Imprimantes réseau : découverte (mDNS) sans annoncer le PC sur le réseau ──
+sed -i 's/^#\?disable-publishing=.*/disable-publishing=yes/; s/^#\?publish-workstation=.*/publish-workstation=no/' /etc/avahi/avahi-daemon.conf
+if ! grep -q mdns_minimal /etc/nsswitch.conf; then
+    sed -i -E 's/^(hosts:.*) resolve /\1 mdns_minimal [NOTFOUND=return] resolve /' /etc/nsswitch.conf
+fi
+grep -E '^(disable-publishing|publish-workstation)=' /etc/avahi/avahi-daemon.conf || true
+grep '^hosts:' /etc/nsswitch.conf || true
 
 # ── Thème Plymouth IXIN (fourni par ixin-artwork) ──
 plymouth-set-default-theme ixin || true

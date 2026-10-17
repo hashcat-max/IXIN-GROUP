@@ -102,6 +102,7 @@ pipewire-jack
 lib32-pipewire
 wireplumber
 alsa-utils
+alsa-firmware
 bluez
 bluez-utils
 # ── Réseau ──
@@ -114,6 +115,19 @@ modemmanager
 iwd
 wpa_supplicant
 nss-mdns
+avahi
+usb_modeswitch
+# ── Imprimantes et scanners (pilotes inclus, imprimantes réseau détectées automatiquement) ──
+cups
+cups-pdf
+gutenprint
+hplip
+ipp-usb
+sane
+sane-airscan
+skanpage
+# ── Capteurs (rotation de l'écran des PC 2-en-1, luminosité automatique) ──
+iio-sensor-proxy
 # ── Bureau KDE Plasma 6 ──
 plasma-meta
 sddm

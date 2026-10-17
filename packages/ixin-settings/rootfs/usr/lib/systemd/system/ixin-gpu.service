@@ -1,0 +1,15 @@
+[Unit]
+Description=IXIN OS : pilote graphique adapté aux cartes NVIDIA anciennes
+Documentation=https://github.com/hashcat-max/IXIN-GROUP
+DefaultDependencies=no
+# Avant la détection du matériel (udev), qui charge les pilotes graphiques
+Before=systemd-udev-trigger.service systemd-modules-load.service sysinit.target
+ConditionPathIsDirectory=/sys/bus/pci/devices
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/ixin/ixin-gpu
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

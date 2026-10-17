@@ -1,0 +1,76 @@
+#!/bin/sh
+# IXIN OS — pilote graphique adapté aux cartes NVIDIA anciennes
+#
+# Le pilote NVIDIA d'IXIN OS (modules « open ») ne gère que les cartes NVIDIA récentes (Turing et
+# suivantes : GTX 16xx, RTX 20xx et plus, 2018+). Il interdit en plus le pilote libre « nouveau » :
+# sur une carte plus ancienne (GTX 10xx, 9xx, 7xx…), le PC n'aurait alors aucun pilote graphique
+# (écran noir ou affichage très lent). Ce script, lancé au démarrage avant le chargement des
+# pilotes, choisit « nouveau » pour ces cartes. Réglages dans /run (rien n'est écrit sur le disque) :
+# la détection est refaite à chaque démarrage, même si la carte graphique change.
+#
+# Forcer un choix (ligne de commande du noyau) : ixin.gpu=nvidia ou ixin.gpu=nouveau
+set -u
+# Tests : IXIN_GPU_ROOT=<dossier> lit <dossier>/sys et <dossier>/cmdline, écrit dans <dossier>/run
+R="${IXIN_GPU_ROOT:-}"
+
+cmdline=/proc/cmdline
+[ -z "$R" ] || cmdline="$R/cmdline"
+choice=""
+for arg in $(cat "$cmdline" 2>/dev/null); do
+    case "$arg" in
+        ixin.gpu=*) choice="${arg#ixin.gpu=}" ;;
+    esac
+done
+
+if [ -z "$choice" ]; then
+    legacy=0 modern=0
+    for d in "$R"/sys/bus/pci/devices/*; do
+        [ -r "$d/vendor" ] || continue
+        [ "$(cat "$d/vendor")" = 0x10de ] || continue
+        case "$(cat "$d/class")" in
+            0x03*) ;;                       # contrôleur d'affichage
+            *) continue ;;
+        esac
+        # Identifiants PCI des puces Turing et suivantes : à partir de 0x1e00
+        if [ $(( $(cat "$d/device") )) -ge $(( 0x1e00 )) ]; then
+            modern=1
+        else
+            legacy=1
+            echo "IXIN : carte NVIDIA ancienne $(cat "$d/device") ($d)"
+        fi
+    done
+    if [ "$legacy" = 1 ] && [ "$modern" = 0 ]; then
+        choice=nouveau
+    else
+        choice=nvidia
+    fi
+fi
+
+[ "$choice" = nouveau ] || exit 0
+
+echo "IXIN : pilote libre « nouveau » choisi pour la carte NVIDIA"
+mkdir -p "$R"/run/modprobe.d
+# Remplace /usr/lib/modprobe.d/nvidia-utils.conf (même nom de fichier) sans l'interdiction de nouveau
+cat > "$R"/run/modprobe.d/nvidia-utils.conf <<'CONF'
+# IXIN OS (ixin-gpu) : carte NVIDIA ancienne, pilote libre nouveau autorisé
+blacklist nova_core
+blacklist nova_drm
+CONF
+cat > "$R"/run/modprobe.d/ixin-gpu.conf <<'CONF'
+# IXIN OS (ixin-gpu) : le pilote NVIDIA ne gère pas cette carte
+blacklist nvidia
+blacklist nvidia_drm
+blacklist nvidia_modeset
+blacklist nvidia_uvm
+install nvidia /bin/false
+install nvidia_drm /bin/false
+install nvidia_modeset /bin/false
+install nvidia_uvm /bin/false
+CONF
+[ -z "$R" ] || exit 0
+# Pilote NVIDIA déjà chargé (initramfs) : retiré, puis nouveau chargé
+for m in nvidia_uvm nvidia_drm nvidia_modeset nvidia; do
+    modprobe -r "$m" 2>/dev/null || true
+done
+modprobe nouveau 2>/dev/null || true
+exit 0
