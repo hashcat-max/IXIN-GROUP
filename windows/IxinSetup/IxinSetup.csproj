@@ -15,7 +15,7 @@
     <RootNamespace>IxinSetup</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\ixin.ico</ApplicationIcon>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>IXIN OS Setup</Product>
     <Company>IXIN Group</Company>
     <Copyright>IXIN Group</Copyright>

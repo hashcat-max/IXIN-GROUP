@@ -6,7 +6,8 @@ fichiers restent en place ; au démarrage du PC, un menu permet ensuite de chois
 ou **Windows**.
 
 > Pour installer IXIN OS seul sur un PC, dans une machine virtuelle, ou si votre PC n'est pas
-> compatible (voir ci-dessous), utilisez l'ISO sur une clé USB : voir la section 10.
+> compatible (voir ci-dessous), utilisez l'ISO sur une clé USB : voir le guide pas à pas
+> [« Installer IXIN OS avec une clé USB »](INSTALLATION-CLE-USB.md).
 
 ---
 
@@ -14,8 +15,9 @@ ou **Windows**.
 
 | | |
 |---|---|
-| Windows | Windows 10 ou 11, 64 bits |
+| Windows | Windows 10 (version 1607 de 2016 ou plus récente) ou Windows 11, **64 bits**, sur un PC à processeur **Intel ou AMD**. Sur un Windows 32 bits, un PC à processeur ARM (Snapdragon) ou Windows 7 / 8, IXIN OS Setup s'ouvre et explique pourquoi il ne peut pas continuer |
 | Démarrage | **UEFI** (cas de presque tous les PC depuis 2012) avec un disque **GPT** ; PC en mode BIOS : clé USB (section 10) |
+| Disque de Windows | un disque interne « de base » (presque tous les PC). Windows sur un disque USB, un disque dynamique ou un espace de stockage : clé USB. Disque en mode RAID / Intel RST : accepté, avec un avertissement (voir *Dépannage*) |
 | Disques | un ou plusieurs : la partition de démarrage (EFI) de Windows peut se trouver sur un autre disque, IXIN OS Setup la trouve (ou en crée une si besoin) |
 | Espace libre sur Windows (C:) | environ **75 Go** : 45 Go minimum pour IXIN OS (80 Go conseillés pour les jeux), 6 Go pour le programme d'installation, 5 Go de téléchargement temporaire, et 20 Go laissés libres à Windows |
 | Alimentation | portable branché sur secteur |
@@ -101,9 +103,15 @@ IXIN OS Setup redémarre directement dans les **paramètres UEFI** du PC :
 2. réglez-le sur **Disabled** ;
 3. enregistrez et quittez (souvent **F10**).
 
-Si le PC redémarre sur Windows au lieu de l'installation, relancez IXIN OS Setup et cliquez sur
-**« Redémarrer et installer IXIN OS »**, ou choisissez **« IXIN OS Setup »** dans le menu de
-démarrage du PC (touche **F12**, **F11**, **F8** ou **Échap** au démarrage selon la marque).
+Si le PC redémarre sur Windows au lieu de l'installation (Secure Boot encore activé, par exemple),
+**IXIN OS Setup se rouvre tout seul** à l'ouverture de session et explique quoi faire : il propose de
+retourner dans les paramètres UEFI, ou de réessayer.
+
+<img src="screenshots/ixin-os-setup-retour-windows-secure-boot.png" alt="IXIN OS Setup rouvert : Secure Boot encore activé" width="520">
+
+Option grisée ? Certains PC demandent d'abord un **mot de passe administrateur du BIOS**
+(« Set Supervisor Password ») ; désactivez ensuite Secure Boot, puis retirez ce mot de passe si vous le
+souhaitez. Sur d'autres, il faut choisir « **Other OS** » au lieu de « Windows UEFI mode ».
 
 ⚠️ **Jeux Windows** : certains jeux avec anti-triche (Valorant, Battlefield 6…) exigent Secure Boot
 **sous Windows**. Tant que Secure Boot est désactivé, ces jeux ne se lancent plus sous Windows.
@@ -158,8 +166,34 @@ impossibles à déplacer se trouvent en fin de disque (Windows ne peut pas rédu
    de restauration sont perdus), puis relancez IXIN OS Setup.
 
 **Le menu « IXIN OS Setup » n'apparaît pas au redémarrage** — certains PC ignorent la demande de
-démarrage unique de Windows. Ouvrez le menu de démarrage du PC (**F12** sur Dell et Lenovo, **F9** sur HP,
-**F8** sur Asus, **F11** sur MSI, **Échap** ou **F12** sur Acer) et choisissez **« IXIN OS Setup »**.
+démarrage unique de Windows. IXIN OS Setup se rouvre alors tout seul à l'ouverture de session : cliquez
+sur **« Réessayer »** — l'installation est cette fois placée **en tête** de l'ordre de démarrage du PC
+(le menu d'IXIN OS Setup s'affichera à chaque démarrage, avec « Revenir à Windows », jusqu'à l'installation
+ou à « Annuler la préparation »). Le programme indique aussi la touche du menu de démarrage de votre
+marque de PC (**F12** sur Dell, Lenovo et Acer, **Échap puis F9** sur HP, **F8** ou **Échap** sur Asus,
+**F11** sur MSI) : choisissez-y **« IXIN OS Setup »**.
+
+<img src="screenshots/ixin-os-setup-retour-windows.png" alt="IXIN OS Setup rouvert après un retour sur Windows" width="520">
+
+**« Windows a protégé votre ordinateur » / « Smart App Control a bloqué… »** — IXIN OS Setup n'est pas
+encore signé par un certificat. SmartScreen : *Informations complémentaires* → *Exécuter quand même*.
+Smart App Control (Windows 11, nouvelles installations) bloque tout programme non signé, sans bouton pour
+passer outre : *Sécurité Windows* → *Contrôle des applications et du navigateur* → *Paramètres de Smart App
+Control* → **Désactivé** — ou installez IXIN OS avec une clé USB.
+
+**« Disque en mode RAID / Intel RST »** (avertissement) — fréquent sur les portables récents (Intel VMD).
+IXIN OS reconnaît ces disques dans la plupart des cas. Si l'installation d'IXIN OS n'affiche **aucun
+disque** à l'étape « Partitions », revenez à Windows (« Revenir à Windows » dans le menu de démarrage, ou
+redémarrez) : rien n'a été modifié par l'installation. Passer le contrôleur en mode **AHCI** dans les
+paramètres du PC règle le problème, mais Windows doit y être préparé d'abord (démarrage en mode sans
+échec), sans quoi il ne démarre plus : demandez de l'aide si vous n'êtes pas à l'aise.
+
+**« Ce PC a un processeur ARM », « Windows 32 bits », « Version de Windows trop ancienne »** — IXIN OS
+Setup ne peut pas préparer l'installation sur ce PC ; rien n'a été modifié. Windows 32 bits ou ancien sur
+un PC 64 bits : IXIN OS s'installe avec une clé USB. Processeur ARM : IXIN OS ne peut pas s'y installer.
+
+**Le téléchargement s'interrompt** — IXIN OS Setup reprend tout seul après une coupure (Wi-Fi instable,
+mise en veille) ; s'il finit par s'arrêter, relancez-le : il repart de là où il en était.
 
 **Après l'installation, le PC démarre directement sur Windows, sans le menu IXIN** — certaines mises
 à jour de Windows remettent Windows en premier dans l'ordre de démarrage. Relancez IXIN OS Setup et
@@ -181,6 +215,8 @@ du PC, touches ci-dessus).
 | Entrée « IXIN OS Setup » du menu de démarrage du PC (Windows reste le choix par défaut) | idem |
 | Démarrage rapide de Windows désactivé, horloge matérielle en UTC (modifiables dans les options avancées) | « Annuler » rétablit les anciennes valeurs |
 | BitLocker suspendu 3 démarrages (si actif) | réactivation automatique par Windows |
+| Tâche planifiée « IXIN OS Setup » (une seule fois, à la prochaine ouverture de session après « Redémarrer et installer ») et copie du programme dans `C:\ProgramData\IXIN` : rouvre IXIN OS Setup si le PC revient sur Windows | retirée dès que le programme s'est rouvert, ou par « Annuler » |
+| Services Windows « Disque virtuel », « Stockage » ou WMI, seulement s'ils avaient été **désactivés** (logiciels d'« optimisation ») : remis en démarrage manuel, leur réglage d'origine | — |
 
 Journal détaillé : `C:\ProgramData\IXIN\setup.log` ; état : `C:\ProgramData\IXIN\setup-state.json`.
 
@@ -212,11 +248,12 @@ Journal détaillé : `C:\ProgramData\IXIN\setup.log` ; état : `C:\ProgramData\I
 
 ## 10. Installer avec une clé USB (PC en mode BIOS, disque MBR, PC sans Windows)
 
+Le guide complet, pas à pas et pour débutants, est ici :
+**[Installer IXIN OS avec une clé USB](INSTALLATION-CLE-USB.md)**. En résumé :
+
 1. Il faut une **clé USB de 8 Go** ou plus : **tout son contenu sera effacé**.
-2. Sur la page des versions, téléchargez les morceaux de l'ISO (`….iso.part00`, `.part01`, `.part02`)
-   dans un même dossier, puis reconstituez l'ISO : dans ce dossier, clic droit → *Ouvrir dans le
-   terminal*, puis tapez la commande indiquée dans les notes de la version
-   (`cmd /c copy /b ….part00+….part01+….part02 ixin-os.iso`).
+2. Téléchargez l'ISO en **un seul fichier** sur [os.ixin.online/telecharger](https://os.ixin.online/telecharger)
+   (sur la page des versions GitHub, elle est découpée en morceaux à recoller : voir le guide).
 3. Téléchargez **Rufus** (rufus.ie), branchez la clé, choisissez-la dans *Périphérique*, cliquez sur
    *Sélection* pour choisir `ixin-os.iso`, puis *Démarrer*. Si Rufus demande un mode d'écriture,
    choisissez **« Écrire en mode Image DD »**.

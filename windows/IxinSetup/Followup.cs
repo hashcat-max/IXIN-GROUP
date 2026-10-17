@@ -22,7 +22,7 @@ namespace IxinSetup
         {
             try
             {
-                Directory.CreateDirectory(Log.Directory);
+                Log.SecureDirectory();
                 string exe = Application.ExecutablePath;
                 // Copie dans C:\ProgramData\IXIN : le fichier téléchargé peut être supprimé ou déplacé d'ici là
                 if (!string.Equals(Path.GetFullPath(exe), Path.GetFullPath(CopyPath), StringComparison.OrdinalIgnoreCase))

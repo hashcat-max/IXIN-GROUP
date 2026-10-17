@@ -47,6 +47,15 @@ namespace IxinSetup
             Expect(taskExists(), "réouverture après redémarrage programmée");
             Followup.Disarm();
             Expect(!taskExists(), "réouverture après redémarrage retirée");
+            var rules = Directory.GetAccessControl(Log.Directory)
+                .GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+                .Cast<System.Security.AccessControl.FileSystemAccessRule>();
+            const System.Security.AccessControl.FileSystemRights write =
+                System.Security.AccessControl.FileSystemRights.WriteData | System.Security.AccessControl.FileSystemRights.AppendData;
+            Expect(!rules.Any(r => r.AccessControlType == System.Security.AccessControl.AccessControlType.Allow &&
+                                   (r.FileSystemRights & write) != 0 &&
+                                   new[] { "S-1-5-32-545", "S-1-5-11", "S-1-1-0", "S-1-3-0" }.Contains(r.IdentityReference.Value)),
+                   "C:\\ProgramData\\IXIN protégé : les comptes non administrateurs ne peuvent pas y écrire");
 
             string iso = Path.Combine(workDir, "ixin-os-test.iso");
             var rnd = new byte[64 << 20];
