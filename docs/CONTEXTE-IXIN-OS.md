@@ -4,8 +4,8 @@
 > **os.ixin.online** (presentation, downloads, documentation). Everything stated here exists and has been
 > tested, unless explicitly marked otherwise. **Please do not invent features that are not listed here.**
 >
-> **Last update: October 16, 2026 — current release `build-2026.10.16-4`** (new: §0 release `-4`, §3 screenshots
-> of the whole "install from Windows" journey, §4 update server live on GitHub Pages, §8 new downloads).
+> **Last update: October 17, 2026 — current release `build-2026.10.17-5`** (new: §0 release `-5` — EFI partition
+> found on any disk or created automatically, advanced options —, §3 new screenshots, §5.1, §8 new downloads).
 > Companion file (French, ready to adapt into a page): `docs/INSTALLATION-WINDOWS.md`, the complete
 > "Installer IXIN OS à côté de Windows" user guide.
 
@@ -13,7 +13,17 @@
 
 ## 0. What's new (for a "Nouveautés" section)
 
-### `build-2026.10.16-4` (October 16, 2026) — current release
+### `build-2026.10.17-5` (October 17, 2026) — current release
+- **IXIN OS Setup works on more PCs**: it no longer refuses PCs whose EFI (boot) partition is on another disk (PCs
+  installed with two disks plugged in — they used to get "Partition EFI introuvable"). It looks at every disk, and
+  if no EFI partition is usable (none, almost full, on a USB disk) it **creates one automatically** (300 MB).
+- **Even simpler for beginners**: the space page only asks for the size; on the IXIN side, the right disk, the free
+  space and the right EFI partition are **already selected** at the "Partitions" step — just tick encryption.
+- **Advanced options for experienced users** ("Options avancées…"): exact size, choice of EFI partition (existing or
+  dedicated), ISO already downloaded, keep the installer partition, Windows settings.
+- Clearer message on PCs in BIOS mode, with a step-by-step USB stick guide.
+
+### `build-2026.10.16-4` (October 16, 2026)
 Two fixes on top of `-3`, same features:
 - **Installation started from Windows**: at the "Partitions" step the installer now offers only "Remplacer une
   partition" (the free space prepared by IXIN OS Setup) and manual partitioning. The "Installer à côté" option, which
@@ -34,7 +44,7 @@ Two fixes on top of `-3`, same features:
   layout with a separate `/boot` partition, compatible with the small EFI partition of Windows PCs; the NTFS tools
   needed to shrink Windows from a USB installation are included again.
 - Releases `build-2026.10.15-1` and `-2` are **obsolete** (no IXIN Update, no Windows installer, known boot issue on
-  `-1`), and `-3` is replaced by `-4`: the site should only link to the **latest** release.
+  `-1`), and `-3` / `-4` are replaced by `-5`: the site should only link to the **latest** release.
 
 ## 1. What IXIN OS is
 
@@ -319,18 +329,18 @@ EFI partition (512 MB, or the existing Windows one) + separate **1 GB `/boot`** 
 
 ## 8. Downloads
 
-Current release: **`build-2026.10.16-4`** (October 16, 2026) — https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.16-4
+Current release: **`build-2026.10.17-5`** (October 17, 2026) — https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.17-5
 
 | File | Size | For |
 |---|---|---|
 | `IXIN-OS-Setup.exe` | 3.7 MB | Windows 10 / 11: install without a USB stick (downloads IXIN OS itself) |
-| `ixin-os-2026.10.16-x86_64.iso.part00` / `.part01` / `.part02` | 1.99 + 1.99 + 1.08 GB (**5.06 GB** in total) | USB stick, virtual machine |
-| `ixin-os-2026.10.16-x86_64.iso.sha256` | — | integrity check of the reassembled ISO |
+| `ixin-os-2026.10.17-x86_64.iso.part00` / `.part01` / `.part02` | 1.99 + 1.99 + 1.08 GB (**5.06 GB** in total) | USB stick, virtual machine |
+| `ixin-os-2026.10.17-x86_64.iso.sha256` | — | integrity check of the reassembled ISO |
 
-- ISO SHA-256: `e48619f63a1c829101f0d576d7c619155f534610f3b7c10f80565c0da496e709`
-- `IXIN-OS-Setup.exe` SHA-256: `d7c8f44bc16f72e607c2bfbacbeb29610298b68ffedb63c163e1ea8f7262c370`
+- ISO SHA-256: `c46aff61207e7ba226fbacf7c6b108fe4f09360d5adf4dad35b09bdb074e78e8`
+- `IXIN-OS-Setup.exe` SHA-256: `7dfcacc1773e1f71051a1a654599afce3b1e74a1b8961927beea7b73e3734c02`
 - These values change with every release: if the site shows them, read them from the API below (each asset has a
-  `digest` field, e.g. `sha256:d7c8…c370`) rather than hard-coding them.
+  `digest` field, e.g. `sha256:7dfc…4c02`) rather than hard-coding them.
 - **Stable links** (always the latest release, good for buttons):
   - `https://github.com/hashcat-max/IXIN-GROUP/releases/latest/download/IXIN-OS-Setup.exe`
   - release page: `https://github.com/hashcat-max/IXIN-GROUP/releases/latest`
@@ -346,8 +356,7 @@ Current release: **`build-2026.10.16-4`** (October 16, 2026) — https://github.
 
 ## 9. Project status (to stay honest on the site)
 
-- Version: **Beta (v0.1)**, rolling, dated builds. Latest: **`build-2026.10.16-4`** (`-3`, the first complete
-  release with IXIN Update and install from Windows, plus two fixes — §0). Older releases are obsolete.
+- Version: **Beta (v0.1)**, rolling, dated builds. Latest: **`build-2026.10.17-5`** (§0). Older releases are obsolete.
 - Tested in a VM: ISO build, UEFI boot, live desktop + taskbar, IXIN Center, graphical installer, full encrypted install,
   reboot of the installed system (GRUB → IXIN unlock screen → login → desktop; firewall, AppArmor, LUKS2 and encrypted
   DNS checked on the installed system).
@@ -363,6 +372,11 @@ Current release: **`build-2026.10.16-4`** (October 16, 2026) — https://github.
 - Known limits: Secure Boot must be off; IXIN OS Setup is not code-signed (SmartScreen warning); BIOS / MBR PCs need a USB
   stick; IXIN OS Setup installs on the Windows disk only; no automatic **uninstall** of IXIN OS yet; "Installer à côté"
   from a USB stick not yet tested with a real Windows.
+- EFI partition handling (`-5`) tested on a real Windows (GitHub Actions, virtual disks) for three PCs: EFI partition
+  on the Windows disk, on another disk, none (created then removed by "Annuler"); and in a VM on a simulated PC with
+  two disks (EFI partition on the first, Windows on the second): disk, free space and EFI partition preselected,
+  full encrypted install, IXIN / Windows menu, automatic cleanup at first start. Dedicated EFI partition: chosen
+  automatically by the installer, Windows found in the other EFI partition for the boot menu.
 - `build-2026.10.16-4` checked after publication: SHA-256 of the reassembled ISO, then the published ISO started in a
   VM on a simulated Windows PC in the "launched from Windows" mode: the "Partitions" step offers only "Remplacer une
   partition" and manual partitioning.

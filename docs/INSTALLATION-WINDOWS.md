@@ -74,8 +74,8 @@ IXIN OS Setup vérifie tout cela lui-même et explique ce qui bloque.
 
    Pour protéger Windows, effacer le disque ou réduire de nouveau Windows est refusé dans ce mode,
    et une partition Windows ne peut jamais être choisie pour être remplacée.
-   *Avec une ISO plus ancienne que build-2026.10.16-4 (choisie à l'étape 3), une option « Installer à
-   côté » apparaît aussi : ne la choisissez pas.*
+   *Avec une ISO plus ancienne que build-2026.10.16-4 (choisie dans les options avancées), une option
+   « Installer à côté » apparaît aussi : ne la choisissez pas.*
 
    <img src="screenshots/depuis-windows-partitions.png" alt="Étape Partitions : Espace libre sélectionné, système chiffré" width="640">
 
