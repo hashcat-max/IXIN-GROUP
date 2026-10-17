@@ -97,7 +97,10 @@ jobs:
           (le programme n'est pas encore signé ; son code source est dans le dossier windows/ du dépôt).
 
           ### Clé USB, machine virtuelle ou disque entier
-          L'ISO est découpée en morceaux de 1,9 Go (limite GitHub). Pour la reconstituer :
+          Le plus simple : téléchargez l'ISO en un seul fichier sur https://os.ixin.online/telecharger et suivez le
+          guide pas à pas : https://github.com/${GITHUB_REPOSITORY}/blob/HEAD/docs/INSTALLATION-CLE-USB.md
+
+          Ici, l'ISO est découpée en morceaux de 1,9 Go (limite GitHub). Pour la reconstituer :
 
           **Linux / macOS**
           \`\`\`
@@ -116,3 +119,14 @@ jobs:
           NOTES
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "IXIN OS $TAG" --notes-file "$RUNNER_TEMP/notes.md" \
             "$ISO".part* "$ISO.sha256" IXIN-OS-Setup.exe
+
+  site:
+    # Flux du site os.ixin.online (nouvelle version, tailles, SHA-256) publié aussitôt la version créée
+    needs: iso
+    if: startsWith(github.ref, 'refs/tags/') || inputs.release
+    uses: ./.github/workflows/publish-repo.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pages: write
+      id-token: write

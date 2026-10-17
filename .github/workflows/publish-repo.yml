@@ -5,6 +5,10 @@ name: Publier les mises à jour IXIN
 # packages/ ou repo/policy.json arrive chez les utilisateurs en quelques heures
 # (dans l'heure si la politique est marquée « urgent »).
 #
+# Publie aussi le flux du site os.ixin.online (site/ixin-os.json : version, téléchargements,
+# nouveautés, guides, captures — tools/prepare-site-feed.py), à chaque version et à chaque
+# modification de docs/, puis prévient le site (Cloudflare) si ses secrets sont configurés.
+#
 # Hébergement : les versions publiées (« releases ») de ce dépôt GitHub sont immuables, on ne
 # peut pas y remplacer des fichiers ; le dépôt [ixin], qui change à chaque publication, est donc
 # servi par :
@@ -19,8 +23,12 @@ on:
       - "packages/**"
       - "repo/policy.json"
       - "tools/build-packages.sh"
+      - "tools/prepare-site-feed.py"
+      - "docs/**"
       - ".github/workflows/publish-repo.yml"
   workflow_dispatch:
+  # Appelé par « Construire l'ISO » après chaque version publiée : flux du site à jour
+  workflow_call:
   schedule:
     # Chaque lundi : nouvelle signature de la politique (valable 14 jours)
     - cron: "17 4 * * 1"
@@ -89,6 +97,12 @@ jobs:
         if: steps.key.outputs.skip != 'true'
         run: tools/prepare-repo-site.sh out-repo prev "$RUNNER_TEMP/site"
 
+      - name: Flux du site os.ixin.online (version, téléchargements, nouveautés, guides)
+        if: steps.key.outputs.skip != 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/prepare-site-feed.py "$RUNNER_TEMP/site"
+
       - name: Publier sur la branche ixin-repo
         if: steps.key.outputs.skip != 'true'
         env:
@@ -143,3 +157,28 @@ jobs:
       - name: Déployer sur GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
+
+  site:
+    # Prévient le site os.ixin.online que le flux a changé (facultatif : secrets du dépôt,
+    # voir docs/SITE.md). Sans secret, le site relit le flux de lui-même (cache de quelques minutes).
+    needs: pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vider le cache Cloudflare et lancer la mise à jour du site
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ZONE: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CF_HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$CF_TOKEN$CF_HOOK" ]; then
+            echo "Aucun secret Cloudflare : rien à prévenir (docs/SITE.md)"
+            exit 0
+          fi
+          if [ -n "$CF_HOOK" ]; then
+            curl -fsS -X POST "$CF_HOOK" -o /dev/null && echo "Mise à jour du site lancée (deploy hook)"
+          fi
+          if [ -n "$CF_TOKEN" ] && [ -n "$CF_ZONE" ]; then
+            curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE/purge_cache" \
+              -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+              --data '{"hosts":["os.ixin.online"]}' | python3 -c "import json,sys; r=json.load(sys.stdin); print('Cache Cloudflare vidé' if r.get('success') else r); sys.exit(0 if r.get('success') else 1)"
+          fi

@@ -1,0 +1,31 @@
+[
+ {
+  "tag": "build-2026.10.17-5",
+  "date": "2026-10-17",
+  "title": "IXIN OS Setup fonctionne sur plus de PC",
+  "items": [
+   "La partition de démarrage (EFI) est trouvée sur n'importe quel disque, ou créée automatiquement (300 Mo) : les PC qui affichaient « Partition EFI introuvable » sont acceptés.",
+   "Encore plus simple : seule la taille est demandée ; côté IXIN, le bon disque, l'espace libre et la bonne partition EFI sont déjà sélectionnés.",
+   "« Options avancées… » pour les utilisateurs expérimentés : taille exacte, partition EFI, ISO déjà téléchargée, garder la partition d'installation, réglages de Windows."
+  ]
+ },
+ {
+  "tag": "build-2026.10.16-4",
+  "date": "2026-10-16",
+  "title": "Corrections de l'installation depuis Windows",
+  "items": [
+   "À l'étape « Partitions », seule la zone libre préparée par IXIN OS Setup est proposée : Windows ne peut pas être réduit une seconde fois.",
+   "IXIN OS Setup : un bouton pas encore utilisable est clairement grisé."
+  ]
+ },
+ {
+  "tag": "build-2026.10.15-3",
+  "date": "2026-10-15",
+  "title": "Première version complète",
+  "items": [
+   "Installation depuis Windows, sans clé USB : IXIN OS Setup vérifie le PC, télécharge IXIN OS, fait de la place et redémarre sur l'installation.",
+   "Menu de démarrage IXIN OS / Windows, pensé pour que BitLocker ne demande pas sa clé de récupération.",
+   "IXIN Update intégré : mises à jour automatiques et correctifs de sécurité signés par l'équipe IXIN."
+  ]
+ }
+]
