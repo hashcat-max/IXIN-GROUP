@@ -38,6 +38,7 @@ namespace IxinSetup
         public bool EspCreated { get; set; }            // partition EFI créée par IXIN OS Setup
         public bool KeepSetupPartition { get; set; }    // IXIN-SETUP gardée après l'installation (option avancée)
         public bool Completed { get; set; }
+        public int RestartTries { get; set; }           // redémarrages vers l'installation demandés
 
         private static string FilePath => Path.Combine(Log.Directory, "setup-state.json");
 

@@ -61,22 +61,61 @@ namespace IxinSetup
 
         public static string DownloadDirectory => Path.Combine(Log.Directory, "telechargement");
 
+        /// <summary>
+        /// Copie de la description de la dernière version (même format que l'API de GitHub), publiée sur
+        /// GitHub Pages à chaque version : utilisée si l'API refuse la demande (limite de 60 demandes par
+        /// heure et par adresse IP, vite atteinte derrière une box partagée ou un réseau d'entreprise).
+        /// </summary>
+        public const string MirrorUrl = "https://hashcat-max.github.io/IXIN-GROUP/site/release.json";
+
         public static ReleaseInfo Latest(CancellationToken ct)
         {
-            string json;
-            using (var req = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repository}/releases/latest"))
+            try
             {
-                req.Headers.Accept.ParseAdd("application/vnd.github+json");
-                using (var resp = Client.SendAsync(req, ct).GetAwaiter().GetResult())
+                return Parse(GetJson($"https://api.github.com/repos/{Repository}/releases/latest", ct, true));
+            }
+            catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is NoReleaseException))
+            {
+                Log.Warn("API de GitHub indisponible (" + ex.Message + ") : copie publiée sur GitHub Pages");
+                try
                 {
-                    if (resp.StatusCode == HttpStatusCode.NotFound)
-                        throw new SetupException("Aucune version d'IXIN OS n'est publiée pour le moment (ou le dépôt n'est pas public).");
-                    if (!resp.IsSuccessStatusCode)
-                        throw new SetupException($"Le serveur de téléchargement a répondu {(int)resp.StatusCode} ({resp.ReasonPhrase}).");
-                    json = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    return Parse(GetJson(MirrorUrl, ct, false));
+                }
+                catch (Exception mirror) when (!(mirror is OperationCanceledException))
+                {
+                    Log.Warn("Copie GitHub Pages : " + mirror.Message);
+                    throw ex is SetupException ? ex : new SetupException("Impossible de joindre le serveur de téléchargement : " + ex.Message, ex);
                 }
             }
-            return Parse(json);
+        }
+
+        private sealed class NoReleaseException : SetupException
+        {
+            public NoReleaseException() : base("Aucune version d'IXIN OS n'est publiée pour le moment (ou le dépôt n'est pas public).") { }
+        }
+
+        private static string GetJson(string url, CancellationToken ct, bool api)
+        {
+            using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            using (var req = new HttpRequestMessage(HttpMethod.Get, url))
+            {
+                timeout.CancelAfter(TimeSpan.FromSeconds(60));
+                if (api) req.Headers.Accept.ParseAdd("application/vnd.github+json");
+                try
+                {
+                    using (var resp = Client.SendAsync(req, timeout.Token).GetAwaiter().GetResult())
+                    {
+                        if (api && resp.StatusCode == HttpStatusCode.NotFound) throw new NoReleaseException();
+                        if (!resp.IsSuccessStatusCode)
+                            throw new SetupException($"Le serveur de téléchargement a répondu {(int)resp.StatusCode} ({resp.ReasonPhrase}).");
+                        return resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    }
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    throw new SetupException("Le serveur de téléchargement ne répond pas (délai dépassé).");
+                }
+            }
         }
 
         public static ReleaseInfo Parse(string json)
@@ -156,50 +195,31 @@ namespace IxinSetup
                 for (int i = 0; i < r.Parts.Count; i++)
                 {
                     var part = r.Parts[i];
+                    int failures = 0;
                     while (st.Done[i] < part.Size)
                     {
                         ct.ThrowIfCancellationRequested();
-                        using (var req = new HttpRequestMessage(HttpMethod.Get, part.Url))
+                        long before = st.Done[i];
+                        try
                         {
-                            if (st.Done[i] > 0) req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(st.Done[i], null);
-                            using (var resp = Client.SendAsync(req, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct).GetAwaiter().GetResult())
-                            {
-                                if (st.Done[i] > 0 && resp.StatusCode != HttpStatusCode.PartialContent)
-                                    st.Done[i] = 0;   // reprise refusée par le serveur : on recommence ce morceau
-                                else if (!resp.IsSuccessStatusCode)
-                                    throw new SetupException($"Téléchargement de {part.Name} : erreur {(int)resp.StatusCode} ({resp.ReasonPhrase}).");
-                                output.Position = offset + st.Done[i];
-                                using (var input = resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                                {
-                                    var buffer = new byte[1 << 20];
-                                    long sinceSave = 0;
-                                    int n;
-                                    while (st.Done[i] < part.Size && (n = input.Read(buffer, 0, (int)Math.Min(buffer.Length, part.Size - st.Done[i]))) > 0)
-                                    {
-                                        ct.ThrowIfCancellationRequested();
-                                        output.Write(buffer, 0, n);
-                                        st.Done[i] += n;
-                                        sinceSave += n;
-                                        if (sinceSave >= 64 << 20)
-                                        {
-                                            output.Flush(true);
-                                            File.WriteAllText(stateFile, ser.Serialize(st));
-                                            sinceSave = 0;
-                                        }
-                                        double seconds = Math.Max(1, (DateTime.UtcNow - started).TotalSeconds);
-                                        progress?.Report(new Transfer
-                                        {
-                                            Stage = "Téléchargement d'IXIN OS",
-                                            Done = st.Done.Sum(),
-                                            Total = total,
-                                            BytesPerSecond = (st.Done.Sum() - startedAt) / seconds,
-                                        });
-                                    }
-                                }
-                            }
+                            DownloadRange(part, i, offset, st, output, stateFile, ser, total, started, startedAt, progress, ct);
                         }
-                        output.Flush(true);
-                        File.WriteAllText(stateFile, ser.Serialize(st));
+                        catch (Exception ex) when (!ct.IsCancellationRequested &&
+                                                   (ex is IOException || ex is HttpRequestException || ex is WebException ||
+                                                    ex is OperationCanceledException || ex is ObjectDisposedException || ex is TransientException))
+                        {
+                            // Connexion coupée ou figée (Wi-Fi instable, mise en veille…) : on reprend là où on en était
+                            failures = st.Done[i] > before ? 1 : failures + 1;
+                            output.Flush(true);
+                            File.WriteAllText(stateFile, ser.Serialize(st));
+                            if (failures > 12)
+                                throw new SetupException("Le téléchargement s'interrompt sans cesse : vérifiez la connexion à Internet, puis " +
+                                                         "relancez IXIN OS Setup — il reprendra là où il s'est arrêté.", ex);
+                            int wait = Math.Min(60, 5 * failures);
+                            Log.Warn($"Téléchargement de {part.Name} interrompu ({ex.Message}) : nouvel essai dans {wait} s");
+                            progress?.Report(new Transfer { Stage = $"Connexion interrompue, nouvel essai dans {wait} s", Done = st.Done.Sum(), Total = total });
+                            if (ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(wait))) ct.ThrowIfCancellationRequested();
+                        }
                     }
                     offset += part.Size;
                 }
@@ -217,6 +237,79 @@ namespace IxinSetup
             File.Move(partial, iso);
             Log.Info($"ISO téléchargée et vérifiée : {r.IsoName} ({expected})");
             return iso;
+        }
+
+        private sealed class TransientException : Exception
+        {
+            public TransientException(string message) : base(message) { }
+        }
+
+        /// <summary>Une requête : le morceau <paramref name="i"/> depuis là où il s'est arrêté.</summary>
+        private static void DownloadRange(Asset part, int i, long offset, DownloadProgress st, FileStream output, string stateFile,
+                                          JavaScriptSerializer ser, long total, DateTime started, long startedAt,
+                                          IProgress<Transfer> progress, CancellationToken ct)
+        {
+            using (var req = new HttpRequestMessage(HttpMethod.Get, part.Url))
+            {
+                if (st.Done[i] > 0) req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(st.Done[i], null);
+                using (var headers = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                {
+                    headers.CancelAfter(TimeSpan.FromSeconds(60));
+                    using (var resp = Client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, headers.Token).GetAwaiter().GetResult())
+                    {
+                        if (st.Done[i] > 0 && resp.StatusCode != HttpStatusCode.PartialContent && resp.IsSuccessStatusCode)
+                            st.Done[i] = 0;   // reprise refusée par le serveur : on recommence ce morceau
+                        else if ((int)resp.StatusCode >= 500 || (int)resp.StatusCode == 429 || resp.StatusCode == HttpStatusCode.RequestTimeout)
+                            throw new TransientException($"erreur {(int)resp.StatusCode} du serveur");
+                        else if (!resp.IsSuccessStatusCode)
+                            throw new SetupException($"Téléchargement de {part.Name} : erreur {(int)resp.StatusCode} ({resp.ReasonPhrase}).");
+                        output.Position = offset + st.Done[i];
+                        using (var input = resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
+                        {
+                            // Connexion figée sans erreur (fréquent en Wi-Fi) : sans donnée pendant 60 s, la
+                            // réponse est fermée, la lecture échoue et le téléchargement reprend.
+                            long lastDone = st.Done[i];
+                            var watchdog = new Timer(_ =>
+                            {
+                                if (st.Done[i] == lastDone) { try { resp.Dispose(); } catch (Exception) { } }
+                                lastDone = st.Done[i];
+                            }, null, 60000, 60000);
+                            using (watchdog)
+                            using (ct.Register(() => { try { resp.Dispose(); } catch (Exception) { } }))
+                            {
+                                var buffer = new byte[1 << 20];
+                                long sinceSave = 0;
+                                int n;
+                                while (st.Done[i] < part.Size && (n = input.Read(buffer, 0, (int)Math.Min(buffer.Length, part.Size - st.Done[i]))) > 0)
+                                {
+                                    ct.ThrowIfCancellationRequested();
+                                    output.Write(buffer, 0, n);
+                                    st.Done[i] += n;
+                                    sinceSave += n;
+                                    if (sinceSave >= 64 << 20)
+                                    {
+                                        output.Flush(true);
+                                        File.WriteAllText(stateFile, ser.Serialize(st));
+                                        sinceSave = 0;
+                                    }
+                                    double seconds = Math.Max(1, (DateTime.UtcNow - started).TotalSeconds);
+                                    progress?.Report(new Transfer
+                                    {
+                                        Stage = "Téléchargement d'IXIN OS",
+                                        Done = st.Done.Sum(),
+                                        Total = total,
+                                        BytesPerSecond = (st.Done.Sum() - startedAt) / seconds,
+                                    });
+                                }
+                                ct.ThrowIfCancellationRequested();
+                                if (st.Done[i] < part.Size) throw new TransientException("connexion fermée avant la fin du morceau");
+                            }
+                        }
+                    }
+                }
+            }
+            output.Flush(true);
+            File.WriteAllText(stateFile, ser.Serialize(st));
         }
 
         public static string FetchChecksum(ReleaseInfo r, CancellationToken ct)

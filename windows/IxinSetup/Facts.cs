@@ -50,6 +50,7 @@ namespace IxinSetup
         public int PartitionNumber;
         public string PartitionStyle = "";
         public string DiskName = "";
+        public string BusType = "";         // NVMe, SATA, RAID (Intel RST…), USB…
         public long DiskSize;
         public long Offset, Size, SizeMin, Free;
         public List<EspInfo> Esps = new List<EspInfo>();   // partitions EFI de tous les disques
@@ -95,7 +96,12 @@ namespace IxinSetup
         {
             const string script = @"
 param([string]$Letter)
-$p = Get-Partition -DriveLetter $Letter
+$p = Get-Partition -DriveLetter $Letter -ErrorAction SilentlyContinue
+if (-not $p) {
+    # Volume sans partition « de base » : disque dynamique, espace de stockage, RAID logiciel de Windows
+    if (Get-Volume -DriveLetter $Letter -ErrorAction SilentlyContinue) { return [pscustomobject]@{ NotBasic = $true } }
+    $p = Get-Partition -DriveLetter $Letter
+}
 $d = Get-Disk -Number $p.DiskNumber
 $s = Get-PartitionSupportedSize -DiskNumber $p.DiskNumber -PartitionNumber $p.PartitionNumber
 $v = Get-Volume -DriveLetter $Letter
@@ -103,8 +109,14 @@ $v = Get-Volume -DriveLetter $Letter
     DiskNumber = [int]$p.DiskNumber; PartitionNumber = [int]$p.PartitionNumber
     Offset = [long]$p.Offset; Size = [long]$p.Size; SizeMin = [long]$s.SizeMin; Free = [long]$v.SizeRemaining
     PartitionStyle = [string]$d.PartitionStyle; DiskName = [string]$d.FriendlyName; DiskSize = [long]$d.Size
+    BusType = [string]$d.BusType; NotBasic = $false
 }";
             var o = Ps.One(script, new Hashtable { ["Letter"] = f.DriveLetter[0] });
+            if (Ps.Bool(o, "NotBasic"))
+                throw new SetupException($"Windows ({f.DriveLetter}:) est sur un disque dynamique, un espace de stockage ou un RAID " +
+                                         "logiciel de Windows : IXIN OS Setup ne sait préparer que les disques « de base » (le cas de presque " +
+                                         "tous les PC). Installez IXIN OS avec une clé USB sur un autre disque.");
+            f.BusType = Ps.Str(o, "BusType");
             f.DiskNumber = (int)Ps.Long(o, "DiskNumber");
             f.PartitionNumber = (int)Ps.Long(o, "PartitionNumber");
             f.Offset = Ps.Long(o, "Offset");
@@ -206,7 +218,7 @@ foreach ($p in @(Get-Partition -ErrorAction Ignore | Where-Object { $_.GptType -
             var sb = new StringBuilder();
             sb.AppendLine("Windows : " + WindowsName);
             sb.AppendLine("UEFI : " + IsUefi + " ; Secure Boot : " + (SecureBoot?.ToString() ?? "inconnu"));
-            sb.AppendLine($"Disque {DiskNumber} « {DiskName} » ({PartitionStyle}, {Gb(DiskSize)})");
+            sb.AppendLine($"Disque {DiskNumber} « {DiskName} » ({PartitionStyle}, {BusType}, {Gb(DiskSize)})");
             sb.AppendLine($"{DriveLetter}: partition {PartitionNumber}, {Gb(Size)}, libre {Gb(Free)}, réduction possible {Gb(MaxShrinkByFs)}");
             if (Esps.Count == 0) sb.AppendLine("Partition EFI : aucune trouvée");
             foreach (var e in Esps) sb.AppendLine($"Partition EFI : {e.Describe()} — {e.FileSystem} « {e.Label} » {e.Guid}");

@@ -14,6 +14,7 @@ namespace IxinSetup
     internal sealed class MainForm : Form
     {
         private const string HelpUrl = "https://github.com/hashcat-max/IXIN-GROUP/blob/HEAD/docs/INSTALLATION-WINDOWS.md";
+        private const string UsbHelpUrl = "https://github.com/hashcat-max/IXIN-GROUP/blob/HEAD/docs/INSTALLATION-CLE-USB.md";
 
         private readonly Panel content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background };
         private readonly FlowLayoutPanel footer = new FlowLayoutPanel
@@ -35,8 +36,12 @@ namespace IxinSetup
         private bool keySaved;
         private CancellationTokenSource running;
 
-        public MainForm(bool analyse = true)
+        private readonly bool afterRestart;
+        internal string DemoManufacturer;      // captures d'écran : marque du PC d'exemple   // rouvert automatiquement après « Redémarrer et installer IXIN OS »
+
+        public MainForm(bool analyse = true, bool afterRestart = false)
         {
+            this.afterRestart = afterRestart;
             Text = "IXIN OS Setup";
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -79,6 +84,9 @@ namespace IxinSetup
             Controls.Add(line);
             Controls.Add(header);
 
+            // Petits écrans (portable 1366 × 768 avec mise à l'échelle 125 %…) : la fenêtre ne dépasse jamais
+            // de l'écran, les boutons du bas restent visibles et le contenu défile.
+            Load += (s, e) => FitToScreen();
             if (analyse) Shown += async (s, e) => await Analyse();
             FormClosing += (s, e) =>
             {
@@ -90,6 +98,15 @@ namespace IxinSetup
                 }
                 e.Cancel = true;
             };
+        }
+
+        private void FitToScreen()
+        {
+            var area = Screen.FromControl(this).WorkingArea;
+            if (Height > area.Height) Height = area.Height;
+            if (Width > area.Width) Width = area.Width;
+            Left = Math.Max(area.Left, area.Left + (area.Width - Width) / 2);
+            Top = Math.Max(area.Top, area.Top + (area.Height - Height) / 2);
         }
 
         // ── navigation ────────────────────────────────────────────────────────
@@ -141,19 +158,50 @@ namespace IxinSetup
         private async Task Analyse()
         {
             ShowPage(Busy("Analyse du PC…", "Lecture du disque de Windows, de BitLocker et de Secure Boot (jusqu'à une minute)."));
+            var unsupported = Compat.Check();
+            if (unsupported != null)
+            {
+                Log.Warn($"PC non pris en charge : {unsupported.Title} ({Compat.NativeArchitecture()}, build {Compat.WindowsBuild()})");
+                ShowUnsupported(unsupported);
+                return;
+            }
             try
             {
                 string drive = (Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").Substring(0, 1);
                 state = SetupState.Load();
-                facts = await Task.Run(() => Facts.Collect(drive));
+                if (afterRestart) await Task.Run(() => Followup.Disarm());
+                facts = await Task.Run(() =>
+                {
+                    Compat.EnsureServices();
+                    return Facts.Collect(drive);
+                });
                 Log.Info("Analyse :\n" + facts.Describe());
                 ixinEntries = facts.IsUefi ? await Task.Run(() => BootEntry.FindIxin()) : new List<string>();
                 if (ixinEntries.Count > 0) Log.Info("IXIN OS est déjà installé (entrée du firmware " + ixinEntries[0] + ")");
+            }
+            catch (Exception ex) when (ex is System.IO.FileNotFoundException || ex is TypeLoadException || ex is TypeInitializationException)
+            {
+                // System.Management.Automation absent : Windows PowerShell retiré ou désactivé
+                Log.Error(ex.ToString());
+                ShowError("Windows PowerShell est absent ou désactivé sur ce PC : IXIN OS Setup en a besoin pour lire les disques. " +
+                          "Réactivez-le (Paramètres → Applications → Fonctionnalités facultatives), ou installez IXIN OS avec une clé USB.\n\n" + ex.Message);
+                return;
             }
             catch (Exception ex)
             {
                 Log.Error(ex.ToString());
                 ShowError(ex.Message);
+                return;
+            }
+            if (afterRestart)
+            {
+                // Rouvert automatiquement à l'ouverture de session : rien à dire si IXIN OS est installé
+                if (ixinEntries.Count > 0 || state == null || !state.Completed)
+                {
+                    Close();
+                    return;
+                }
+                ShowReturned();
                 return;
             }
             if (state != null && !state.Completed) ShowInterrupted();
@@ -724,8 +772,8 @@ namespace IxinSetup
                 col.Controls.Add(Theme.Label("1.  Cliquez sur « Redémarrer vers les paramètres UEFI ».\n" +
                                              "2.  Dans le menu du PC (souvent l'onglet « Boot » ou « Security »), réglez « Secure Boot » sur « Disabled ».\n" +
                                              "3.  Enregistrez et quittez (souvent la touche F10).\n" +
-                                             "4.  Le PC démarre alors sur l'installation d'IXIN OS. S'il redémarre sur Windows, relancez IXIN OS Setup " +
-                                             "et cliquez sur « Redémarrer et installer IXIN OS ».", null, Theme.Text));
+                                             "4.  Le PC démarre alors sur l'installation d'IXIN OS. S'il revient sur Windows, IXIN OS Setup se rouvre " +
+                                             "tout seul et vous guide.", null, Theme.Text));
                 col.Controls.Add(Theme.Label("Dans l'installation, à l'étape « Partitions », choisissez « Remplacer une partition » puis la zone « Espace libre ».", Theme.Small, Theme.Muted));
                 ShowPage(col,
                     Action("Redémarrer vers les paramètres UEFI", () => Restart(true), primary: true),
@@ -737,18 +785,19 @@ namespace IxinSetup
                 col.Controls.Add(Theme.Label("Le PC va redémarrer sur l'installation d'IXIN OS (une seule fois : ensuite, Windows reste le choix par défaut)."));
                 col.Controls.Add(Theme.Label("Dans le menu qui s'affiche, choisissez « Installer IXIN OS (à côté de Windows) ». À l'étape « Partitions » " +
                                              "de l'installation, choisissez « Remplacer une partition » puis cliquez sur la zone « Espace libre ».", null, Theme.Muted));
-                col.Controls.Add(Theme.Label("Le même menu propose « Revenir à Windows » si vous changez d'avis.", Theme.Small, Theme.Muted));
+                col.Controls.Add(Theme.Label("Le même menu propose « Revenir à Windows » si vous changez d'avis. Si le PC revient sur Windows " +
+                                             "sans afficher ce menu, IXIN OS Setup se rouvre tout seul et vous guide.", Theme.Small, Theme.Muted));
                 ShowPage(col,
                     Action("Redémarrer et installer IXIN OS", () => Restart(false), primary: true),
                     Action("Plus tard", Close));
             }
         }
 
-        private void Restart(bool toFirmware)
+        private void Restart(bool toFirmware, bool putFirst = false)
         {
             try
             {
-                Installer.Restart(state ?? SetupState.Load(), toFirmware);
+                Installer.Restart(state ?? SetupState.Load(), toFirmware, putFirst);
                 ShowMessage("Redémarrage…", "Le PC redémarre dans quelques secondes. Enregistrez votre travail dans les autres programmes.");
             }
             catch (Exception ex)
@@ -756,6 +805,62 @@ namespace IxinSetup
                 Log.Error(ex.ToString());
                 ShowError(ex.Message);
             }
+        }
+
+        // ── PC non pris en charge ─────────────────────────────────────────────
+
+        private void ShowUnsupported(Unsupported u)
+        {
+            var col = Theme.Column();
+            col.Controls.Add(Theme.Label(u.Title, Theme.Title, Theme.Warning));
+            col.Controls.Add(Theme.Label(u.Text));
+            col.Controls.Add(Theme.Label("Rien n'a été modifié sur ce PC.", Theme.Small, Theme.Muted));
+            ShowPage(col, Action("Quitter", Close), Action("Aide", () => Open(UsbHelpUrl)));
+        }
+
+        // ── retour sur Windows au lieu de l'installation ──────────────────────
+
+        private void ShowReturned()
+        {
+            var col = Theme.Column();
+            col.Controls.Add(Theme.Label("Le PC a redémarré sur Windows", Theme.Title, Theme.Warning));
+            string maker = (DemoManufacturer ?? Compat.Manufacturer()).Trim();
+            string key = Compat.BootMenuKey(maker);
+            string keyText = key != null
+                ? $"Pour ce PC ({maker}), la touche est en général : {key}."
+                : "Selon la marque : F12 (Acer, Dell, Lenovo…), F11 (MSI, ASRock), F9 (HP), F8 ou Échap (ASUS).";
+            if (facts.SecureBoot == true)
+            {
+                col.Controls.Add(Theme.Label("L'installation d'IXIN OS n'a pas pu démarrer : Secure Boot est toujours activé. " +
+                                             "Le PC refuse alors de la lancer et revient sur Windows."));
+                col.Controls.Add(Theme.Label("1.  Cliquez sur « Redémarrer vers les paramètres UEFI ».\n" +
+                                             "2.  Cherchez « Secure Boot » (souvent dans l'onglet « Boot », « Security » ou « Authentication ») " +
+                                             "et réglez-le sur « Disabled ».\n" +
+                                             "3.  Enregistrez et quittez (souvent la touche F10) : l'installation d'IXIN OS démarre.", null, Theme.Text));
+                col.Controls.Add(Theme.Label("Secure Boot grisé ? Certains PC demandent d'abord un mot de passe administrateur du BIOS " +
+                                             "(« Set Supervisor Password ») : le guide l'explique.", Theme.Small, Theme.Muted));
+                ShowPage(col,
+                    Action("Redémarrer vers les paramètres UEFI", () => Restart(true), primary: true),
+                    Action("Annuler la préparation", async () => await RunUndo()),
+                    Action("Aide", () => Open(HelpUrl + "#3-secure-boot")),
+                    Action("Plus tard", Close));
+                return;
+            }
+            bool retried = state.RestartTries >= 2;
+            col.Controls.Add(Theme.Label(retried
+                ? "Le PC ne lance toujours pas l'installation d'IXIN OS par lui-même. Vous pouvez la choisir à la main au démarrage :"
+                : "Ce PC n'a pas lancé l'installation d'IXIN OS au redémarrage : certains PC ignorent cette demande de Windows. " +
+                  "Cliquez sur « Réessayer » : IXIN OS Setup place cette fois l'installation en tête du démarrage du PC."));
+            col.Controls.Add(Theme.Label("Ou choisissez-la vous-même : redémarrez, appuyez plusieurs fois sur la touche du menu de démarrage " +
+                                         "dès l'allumage, puis choisissez « IXIN OS Setup ». " + keyText, null, retried ? Theme.Text : Theme.Muted));
+            col.Controls.Add(Theme.Label("Tant que l'installation est en tête, le PC affiche à chaque démarrage le menu d'IXIN OS Setup, " +
+                                         "qui propose aussi « Revenir à Windows ». « Annuler la préparation » remet tout comme avant.",
+                                         Theme.Small, Theme.Muted));
+            ShowPage(col,
+                Action("Réessayer", () => Restart(false, putFirst: true), primary: true),
+                Action("Annuler la préparation", async () => await RunUndo()),
+                Action("Aide", () => Open(HelpUrl + "#6-dépannage")),
+                Action("Plus tard", Close));
         }
 
         // ── préparation existante ─────────────────────────────────────────────
@@ -899,6 +1004,12 @@ namespace IxinSetup
                 case "installee":
                     ShowInstalled(false, 6 * Plan.GiB);
                     break;
+                case "retour-windows":
+                    ShowReturned();
+                    break;
+                case "incompatible":
+                    ShowUnsupported(Compat.Check("ARM64", true, 26100));
+                    break;
                 default:
                     throw new ArgumentException("page inconnue : " + page);
             }
@@ -924,7 +1035,11 @@ namespace IxinSetup
             var step = new Progress<string>(s => Log.Info(s));
             try
             {
-                await Task.Run(() => Installer.Undo(state, step));
+                await Task.Run(() =>
+                {
+                    Installer.Undo(state, step);
+                    Followup.Disarm();
+                });
                 state = null;
                 ShowMessage("Préparation annulée", "Windows est dans son état d'origine : l'espace a été rendu et le menu de démarrage retiré.");
             }

@@ -41,6 +41,13 @@ namespace IxinSetup
 
             UnitTests();
 
+            // Réouverture automatique après le redémarrage (tâche planifiée), puis son retrait
+            Func<bool> taskExists = () => BootEntry.Exec("schtasks.exe", "/Query /TN \"IXIN OS Setup\"", out _) == 0;
+            Followup.Arm();
+            Expect(taskExists(), "réouverture après redémarrage programmée");
+            Followup.Disarm();
+            Expect(!taskExists(), "réouverture après redémarrage retirée");
+
             string iso = Path.Combine(workDir, "ixin-os-test.iso");
             var rnd = new byte[64 << 20];
             new Random(42).NextBytes(rnd);
@@ -332,6 +339,27 @@ namespace IxinSetup
                    "lecture du fichier .sha256");
             Expect(Plan.SetupSizeFor(5079388160) == 6 * Plan.GiB, "taille de la partition d'installation");
 
+            // Compatibilité : le programme démarre partout et explique les PC qui ne conviennent pas
+            Expect(Compat.Check("AMD64", true, 19045) == null, "Windows 10 64 bits pris en charge");
+            Expect(Compat.Check("AMD64", true, 26100) == null, "Windows 11 64 bits pris en charge");
+            Expect(Compat.Check("AMD64", true, 14393) == null, "Windows 10 1607 / LTSB 2016 pris en charge");
+            Expect(Compat.Check("ARM64", true, 26100)?.Title.Contains("ARM") == true, "PC ARM refusé avec explication");
+            Expect(Compat.Check("X86", false, 19045)?.Title.Contains("32 bits") == true, "Windows 32 bits refusé avec explication");
+            Expect(Compat.Check("AMD64", true, 9600)?.Title.Contains("ancienne") == true, "Windows 8.1 refusé avec explication");
+            Expect(Compat.Check("AMD64", true, 7601) != null, "Windows 7 refusé avec explication");
+            string arch = Compat.NativeArchitecture();
+            Expect(arch == "AMD64" && Environment.Is64BitProcess, $"processeur de la machine de test lu ({arch}), programme en 64 bits");
+            Expect(Compat.WindowsBuild() >= 10240, $"version de Windows lue (build {Compat.WindowsBuild()})");
+            Expect(Compat.BootMenuKey("LENOVO") != null && Compat.BootMenuKey("Hewlett-Packard") == "Échap puis F9" &&
+                   Compat.BootMenuKey("Micro-Star International Co., Ltd.") == "F11" && Compat.BootMenuKey("Inconnu SA") == null,
+                   "touche du menu de démarrage selon la marque");
+            Expect(new Facts { BusType = "USB", IsUefi = true, PartitionStyle = "GPT", Size = 400 * Plan.GiB, SizeMin = 50 * Plan.GiB,
+                               Free = 300 * Plan.GiB }.Let(f => Plan.Checks(f, null)).Any(k => k.Level == CheckLevel.Blocking && k.Title.Contains("USB")),
+                   "Windows sur un disque USB : bloquant");
+            Expect(new Facts { BusType = "RAID", IsUefi = true, PartitionStyle = "GPT", Size = 400 * Plan.GiB, SizeMin = 50 * Plan.GiB,
+                               Free = 300 * Plan.GiB }.Let(f => Plan.Checks(f, null)).Any(k => k.Level == CheckLevel.Warning && k.Title.Contains("RAID")),
+                   "disque RAID / Intel RST : avertissement");
+
             EspInfo Esp(int disk, bool system, long freeMb = 70, bool usb = false, string guid = "{0F1E2D3C-4B5A-6978-8796-A5B4C3D2E1F0}") =>
                 new EspInfo { Disk = disk, Number = 1, Size = 100 * Storage.MiB, Free = freeMb * Storage.MiB, IsSystem = system,
                               Removable = usb, EspType = true, FileSystem = "FAT32", Guid = guid };
@@ -459,5 +487,10 @@ foreach ($p in @(Get-Partition -DiskNumber $Disk | Where-Object { $_.GptType -eq
                 return sha.ComputeHash(a).SequenceEqual(sha.ComputeHash(b));
             }
         }
+    }
+
+    internal static class TestExtensions
+    {
+        public static TResult Let<T, TResult>(this T value, Func<T, TResult> f) => f(value);
     }
 }

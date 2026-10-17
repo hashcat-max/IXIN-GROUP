@@ -110,7 +110,7 @@ packages/                     paquets IXIN (ixin-tools, ixin-update, ixin-settin
 repo/policy.json              politique IXIN Update (urgent, blocages, annonces)
 tools/                        construction/signature des paquets, clé de signature, migration bêta
 windows/                      installation depuis Windows
-├── IxinSetup/                IXIN-OS-Setup.exe (C#, .NET Framework 4.8)
+├── IxinSetup/                IXIN-OS-Setup.exe (C#, .NET Framework 4.6.2)
 └── boot/                     menu GRUB « IXIN OS Setup » (démarre l'ISO depuis le disque)
 iso/                          profil archiso
 ├── profiledef.sh             nom, étiquette, modes de démarrage

@@ -40,9 +40,14 @@ jobs:
           path: build/windows-boot/
 
   setup:
-    name: IXIN-OS-Setup.exe (compilation + auto-test sur Windows)
+    name: IXIN-OS-Setup.exe (compilation + auto-test sur ${{ matrix.os }})
     needs: boot
-    runs-on: windows-latest
+    # Deux générations de Windows : Server 2022 (noyau de Windows 10 21H2) et Server 2025 (Windows 11 24H2)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-2022]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +60,7 @@ jobs:
       - name: Auto-test sur disque virtuel (préparation + annulation)
         shell: powershell
         run: |
-          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net462/IXIN-OS-Setup.exe"
           $p = Start-Process -FilePath $exe -ArgumentList "--self-test", "$env:RUNNER_TEMP\ixin-selftest" -Wait -PassThru -NoNewWindow
           Write-Host "---- journal ----"
           Get-Content "$env:ProgramData\IXIN\setup.log" -Encoding UTF8 -ErrorAction SilentlyContinue
@@ -63,29 +68,30 @@ jobs:
       - name: Test de l'entrée de démarrage du firmware (machine jetable)
         shell: powershell
         run: |
-          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net462/IXIN-OS-Setup.exe"
           $p = Start-Process -FilePath $exe -ArgumentList "--self-test-boot-entry" -Wait -PassThru -NoNewWindow
           if ($p.ExitCode -ne 0) { throw "Test de l'entrée de démarrage échoué (code $($p.ExitCode))" }
       - name: Informations sur la machine de test
         if: always()
         shell: powershell
         run: |
-          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net462/IXIN-OS-Setup.exe"
           Start-Process -FilePath $exe -ArgumentList "--facts" -Wait -NoNewWindow
       - name: Captures d'écran (données d'exemple, pour le site et la documentation)
         continue-on-error: true
         shell: powershell
         run: |
-          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe"
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net462/IXIN-OS-Setup.exe"
           $p = Start-Process -FilePath $exe -ArgumentList "--screenshots", "$env:RUNNER_TEMP\captures" -Wait -PassThru -NoNewWindow
           Get-ChildItem "$env:RUNNER_TEMP\captures" | Format-Table Name, Length
           if ($p.ExitCode -ne 0) { throw "Captures d'écran : échec (code $($p.ExitCode))" }
       - uses: actions/upload-artifact@v4
+        if: matrix.os == 'windows-2025'
         with:
           name: ixin-os-setup
-          path: windows/IxinSetup/bin/Release/net48/IXIN-OS-Setup.exe
+          path: windows/IxinSetup/bin/Release/net462/IXIN-OS-Setup.exe
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && matrix.os == 'windows-2025'
         with:
           name: ixin-os-setup-captures
           path: ${{ runner.temp }}/captures

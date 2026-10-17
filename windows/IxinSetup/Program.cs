@@ -10,8 +10,9 @@ namespace IxinSetup
         [STAThread]
         private static int Main(string[] args)
         {
+            bool afterRestart = args.Length > 0 && args[0] == Followup.Argument;
             // Modes sans interface (intégration continue / support)
-            if (args.Length > 0 && args[0].StartsWith("--", StringComparison.Ordinal))
+            if (args.Length > 0 && args[0].StartsWith("--", StringComparison.Ordinal) && !afterRestart)
             {
                 Native.AttachParentConsole();
                 switch (args[0])
@@ -24,6 +25,9 @@ namespace IxinSetup
                     case "--self-test-boot-entry":
                         return SelfTest.RunBootEntry();
                     case "--facts":
+                        Console.WriteLine($"Processeur : {Compat.NativeArchitecture()} ; Windows build {Compat.WindowsBuild()} ; " +
+                                          $"64 bits : {Environment.Is64BitOperatingSystem} ; processus 64 bits : {Environment.Is64BitProcess} ; " +
+                                          $".NET {Environment.Version} ; marque : {Compat.Manufacturer()}");
                         Console.WriteLine(Facts.Collect("C").Describe());
                         return 0;
                     case "--screenshots":
@@ -39,8 +43,8 @@ namespace IxinSetup
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (s, e) => Fatal(e.Exception);
             AppDomain.CurrentDomain.UnhandledException += (s, e) => Fatal(e.ExceptionObject as Exception);
-            Log.Info("IXIN OS Setup " + Version + " — démarrage");
-            Application.Run(new MainForm());
+            Log.Info("IXIN OS Setup " + Version + " — démarrage" + (afterRestart ? " (réouverture après redémarrage)" : ""));
+            Application.Run(new MainForm(afterRestart: afterRestart));
             return 0;
         }
 

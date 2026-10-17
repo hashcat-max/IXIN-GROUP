@@ -131,6 +131,15 @@ namespace IxinSetup
             else
             {
                 list.Add(new Check(CheckLevel.Ok, $"Disque GPT : {f.DiskName}", Facts.Gb(f.DiskSize)));
+                if (string.Equals(f.BusType, "USB", StringComparison.OrdinalIgnoreCase))
+                    list.Add(new Check(CheckLevel.Blocking, "Windows est sur un disque USB",
+                        "IXIN OS Setup installe IXIN OS sur le disque de Windows, qui est ici un disque externe. " +
+                        "Installez IXIN OS avec une clé USB sur le disque interne du PC."));
+                else if (string.Equals(f.BusType, "RAID", StringComparison.OrdinalIgnoreCase))
+                    list.Add(new Check(CheckLevel.Warning, "Disque en mode RAID / Intel RST",
+                        "Le disque est géré par un contrôleur RAID (souvent « Intel RST » ou « VMD » sur les portables récents). " +
+                        "IXIN OS le reconnaît dans la plupart des cas ; si l'installation d'IXIN OS ne voit aucun disque, le guide " +
+                        "(« Dépannage ») explique quoi faire, sans risque pour Windows."));
                 var esp = ChooseEsp(f);
                 if (esp.Mode != EspMode.Create && esp.Esp.Disk != f.DiskNumber)
                     list.Add(new Check(CheckLevel.Info, "Partition de démarrage (EFI) sur un autre disque",
@@ -446,11 +455,21 @@ namespace IxinSetup
         }
 
         /// <summary>Redémarre sur l'installation (une seule fois), ou d'abord vers les paramètres UEFI.</summary>
-        public static void Restart(SetupState st, bool toFirmwareSettings)
+        public static void Restart(SetupState st, bool toFirmwareSettings, bool putFirst = false)
         {
             var ids = BootEntry.Find();
             string id = ids.Count > 0 ? ids[0] : RecreateBootEntry(st);
+            // Certains firmwares ignorent « démarrer une seule fois sur… » : après un retour sur Windows,
+            // l'entrée est placée en tête de l'ordre de démarrage (le menu d'IXIN OS Setup propose
+            // « Revenir à Windows », et l'installation d'IXIN OS ou « Annuler » la retirent).
+            if (putFirst) BootEntry.PutFirst(id);
             BootEntry.BootNextOnce(id);
+            if (st != null)
+            {
+                st.RestartTries++;
+                st.Save();
+            }
+            Followup.Arm();
             BootEntry.Restart(toFirmwareSettings);
         }
 

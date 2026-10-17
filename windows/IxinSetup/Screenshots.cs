@@ -33,26 +33,30 @@ namespace IxinSetup
             };
             var installed = new SetupState { Completed = true, IxinSize = 120 * GiB, Created = "2026-10-15T21:42:00" };
             var prepared = new SetupState { Completed = true, IxinSize = 120 * GiB, Created = "2026-10-15T21:42:00" };
+            var returned = new SetupState { Completed = true, IxinSize = 120 * GiB, Created = "2026-10-15T21:42:00", RestartTries = 1 };
             var ixinEntry = new List<string> { "{8c2f41d0-12ab-11f1-b614-70a8a569ed22}" };
 
-            var pages = new (string File, string Page, Facts Pc, SetupState State, List<string> Ixin)[]
+            var pages = new[]
             {
-                ("1-analyse", "analyse", Pc(), null, null),
-                ("2-verification", "verification", Pc(), null, null),
-                ("3-espace", "espace", Pc(), null, null),
-                ("3b-options-avancees", "avancees", Pc(), null, null),
-                ("4-cle-bitlocker", "bitlocker", Pc(), null, null),
-                ("5-confirmation", "confirmation", Pc(), null, null),
-                ("6-preparation", "preparation", Pc(), null, null),
-                ("7-secure-boot", "terminee", Pc(), null, null),
-                ("8-tout-est-pret", "terminee", Pc(secureBoot: false), null, null),
-                ("9-installation-prete", "prete", Pc(secureBoot: false), prepared, null),
-                ("10-ixin-installe", "installee", Pc(secureBoot: false), installed, ixinEntry),
-                ("reduction-bloquee", "verification", Pc(shrinkBlocked: true), null, null),
-                ("efi-autre-disque", "verification", Pc(secureBoot: false, espOnOtherDisk: true), null, null),
+                new Shot("1-analyse", "analyse", Pc(), null, null),
+                new Shot("2-verification", "verification", Pc(), null, null),
+                new Shot("3-espace", "espace", Pc(), null, null),
+                new Shot("3b-options-avancees", "avancees", Pc(), null, null),
+                new Shot("4-cle-bitlocker", "bitlocker", Pc(), null, null),
+                new Shot("5-confirmation", "confirmation", Pc(), null, null),
+                new Shot("6-preparation", "preparation", Pc(), null, null),
+                new Shot("7-secure-boot", "terminee", Pc(), null, null),
+                new Shot("8-tout-est-pret", "terminee", Pc(secureBoot: false), null, null),
+                new Shot("9-installation-prete", "prete", Pc(secureBoot: false), prepared, null),
+                new Shot("10-ixin-installe", "installee", Pc(secureBoot: false), installed, ixinEntry),
+                new Shot("reduction-bloquee", "verification", Pc(shrinkBlocked: true), null, null),
+                new Shot("efi-autre-disque", "verification", Pc(secureBoot: false, espOnOtherDisk: true), null, null),
+                new Shot("retour-windows", "retour-windows", Pc(secureBoot: false), returned, null),
+                new Shot("retour-windows-secure-boot", "retour-windows", Pc(), returned, null),
+                new Shot("pc-incompatible", "incompatible", Pc(), null, null),
             };
 
-            using (var form = new MainForm(analyse: false))
+            using (var form = new MainForm(analyse: false) { DemoManufacturer = "LENOVO" })
             {
                 form.StartPosition = FormStartPosition.Manual;
                 form.Location = new Point(40, 40);
@@ -122,6 +126,23 @@ namespace IxinSetup
                     page.Save(path, ImageFormat.Png);
                 }
             }
+        }
+    }
+
+    internal sealed class Shot
+    {
+        public readonly string File, Page;
+        public readonly Facts Pc;
+        public readonly SetupState State;
+        public readonly List<string> Ixin;
+
+        public Shot(string file, string page, Facts pc, SetupState state, List<string> ixin)
+        {
+            File = file;
+            Page = page;
+            Pc = pc;
+            State = state;
+            Ixin = ixin;
         }
     }
 }

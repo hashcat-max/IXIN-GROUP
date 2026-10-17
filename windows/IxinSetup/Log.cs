@@ -39,7 +39,7 @@ namespace IxinSetup
     }
 
     /// <summary>Erreur expliquée à l'utilisateur (message en français, sans détails techniques bruts).</summary>
-    internal sealed class SetupException : Exception
+    internal class SetupException : Exception
     {
         public SetupException(string message) : base(message) { }
         public SetupException(string message, Exception inner) : base(message, inner) { }
