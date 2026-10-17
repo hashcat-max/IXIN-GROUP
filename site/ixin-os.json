@@ -1,0 +1,147 @@
+{
+ "format": 1,
+ "generated": "2026-10-17T16:26:01Z",
+ "status": "beta",
+ "version": {
+  "tag": "build-2026.10.17-5",
+  "date": "2026-10-17",
+  "url": "https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.17-5",
+  "all_versions": "https://github.com/hashcat-max/IXIN-GROUP/releases"
+ },
+ "downloads": {
+  "setup": {
+   "name": "IXIN-OS-Setup.exe",
+   "size": 3774976,
+   "sha256": "7dfcacc1773e1f71051a1a654599afce3b1e74a1b8961927beea7b73e3734c02",
+   "url": "https://github.com/hashcat-max/IXIN-GROUP/releases/latest/download/IXIN-OS-Setup.exe",
+   "for": "Windows 10 / 11 (64 bits) : installation à côté de Windows, sans clé USB"
+  },
+  "iso": {
+   "name": "ixin-os-2026.10.17-x86_64.iso",
+   "size": 5063438336,
+   "sha256": "c46aff61207e7ba226fbacf7c6b108fe4f09360d5adf4dad35b09bdb074e78e8",
+   "sha256_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/ixin-os-2026.10.17-x86_64.iso.sha256",
+   "parts": [
+    {
+     "name": "ixin-os-2026.10.17-x86_64.iso.part00",
+     "size": 1992294400,
+     "url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/ixin-os-2026.10.17-x86_64.iso.part00"
+    },
+    {
+     "name": "ixin-os-2026.10.17-x86_64.iso.part01",
+     "size": 1992294400,
+     "url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/ixin-os-2026.10.17-x86_64.iso.part01"
+    },
+    {
+     "name": "ixin-os-2026.10.17-x86_64.iso.part02",
+     "size": 1078849536,
+     "url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/ixin-os-2026.10.17-x86_64.iso.part02"
+    }
+   ]
+  }
+ },
+ "requirements": {
+  "cpu": "PC 64 bits Intel ou AMD (x86_64)",
+  "ram_gb": 4,
+  "ram_recommended_gb": 8,
+  "disk_gb": 40,
+  "disk_recommended_gb": 80,
+  "boot": "UEFI (recommandé) ou BIOS",
+  "secure_boot": "à désactiver"
+ },
+ "news": [
+  {
+   "tag": "build-2026.10.17-5",
+   "date": "2026-10-17",
+   "title": "IXIN OS Setup fonctionne sur plus de PC",
+   "items": [
+    "La partition de démarrage (EFI) est trouvée sur n'importe quel disque, ou créée automatiquement (300 Mo) : les PC qui affichaient « Partition EFI introuvable » sont acceptés.",
+    "Encore plus simple : seule la taille est demandée ; côté IXIN, le bon disque, l'espace libre et la bonne partition EFI sont déjà sélectionnés.",
+    "« Options avancées… » pour les utilisateurs expérimentés : taille exacte, partition EFI, ISO déjà téléchargée, garder la partition d'installation, réglages de Windows."
+   ]
+  },
+  {
+   "tag": "build-2026.10.16-4",
+   "date": "2026-10-16",
+   "title": "Corrections de l'installation depuis Windows",
+   "items": [
+    "À l'étape « Partitions », seule la zone libre préparée par IXIN OS Setup est proposée : Windows ne peut pas être réduit une seconde fois.",
+    "IXIN OS Setup : un bouton pas encore utilisable est clairement grisé."
+   ]
+  },
+  {
+   "tag": "build-2026.10.15-3",
+   "date": "2026-10-15",
+   "title": "Première version complète",
+   "items": [
+    "Installation depuis Windows, sans clé USB : IXIN OS Setup vérifie le PC, télécharge IXIN OS, fait de la place et redémarre sur l'installation.",
+    "Menu de démarrage IXIN OS / Windows, pensé pour que BitLocker ne demande pas sa clé de récupération.",
+    "IXIN Update intégré : mises à jour automatiques et correctifs de sécurité signés par l'équipe IXIN."
+   ]
+  }
+ ],
+ "docs": [
+  {
+   "title": "Installer IXIN OS depuis Windows (sans clé USB)",
+   "file": "INSTALLATION-WINDOWS.md",
+   "url": "https://hashcat-max.github.io/IXIN-GROUP/site/docs/INSTALLATION-WINDOWS.md",
+   "github": "https://github.com/hashcat-max/IXIN-GROUP/blob/HEAD/docs/INSTALLATION-WINDOWS.md"
+  },
+  {
+   "title": "Installer IXIN OS avec une clé USB (guide pour débutants)",
+   "file": "INSTALLATION-CLE-USB.md",
+   "url": "https://hashcat-max.github.io/IXIN-GROUP/site/docs/INSTALLATION-CLE-USB.md",
+   "github": "https://github.com/hashcat-max/IXIN-GROUP/blob/HEAD/docs/INSTALLATION-CLE-USB.md"
+  },
+  {
+   "title": "Mises à jour d'IXIN OS (IXIN Update)",
+   "file": "MISES-A-JOUR.md",
+   "url": "https://hashcat-max.github.io/IXIN-GROUP/site/docs/MISES-A-JOUR.md",
+   "github": "https://github.com/hashcat-max/IXIN-GROUP/blob/HEAD/docs/MISES-A-JOUR.md"
+  },
+  {
+   "title": "Présentation complète d'IXIN OS (fiche de référence)",
+   "file": "CONTEXTE-IXIN-OS.md",
+   "url": "https://hashcat-max.github.io/IXIN-GROUP/site/docs/CONTEXTE-IXIN-OS.md",
+   "github": "https://github.com/hashcat-max/IXIN-GROUP/blob/HEAD/docs/CONTEXTE-IXIN-OS.md"
+  }
+ ],
+ "screenshots": {
+  "base_url": "https://hashcat-max.github.io/IXIN-GROUP/site/screenshots/",
+  "files": [
+   "bureau.png",
+   "centre-ixin.png",
+   "depuis-windows-guide.png",
+   "depuis-windows-partitions.png",
+   "deverrouillage-chiffrement.png",
+   "ecran-connexion.png",
+   "grub-installe.png",
+   "installeur-diaporama.png",
+   "installeur-emplacement.png",
+   "installeur-partitions-chiffrement.png",
+   "installeur-utilisateur.png",
+   "ixin-os-setup-1-analyse.png",
+   "ixin-os-setup-10-ixin-installe.png",
+   "ixin-os-setup-2-verification.png",
+   "ixin-os-setup-3-espace.png",
+   "ixin-os-setup-3b-options-avancees.png",
+   "ixin-os-setup-4-cle-bitlocker.png",
+   "ixin-os-setup-5-confirmation.png",
+   "ixin-os-setup-6-preparation.png",
+   "ixin-os-setup-7-secure-boot.png",
+   "ixin-os-setup-8-tout-est-pret.png",
+   "ixin-os-setup-9-installation-prete.png",
+   "ixin-os-setup-efi-autre-disque.png",
+   "ixin-os-setup-pc-incompatible.png",
+   "ixin-os-setup-reduction-bloquee.png",
+   "ixin-os-setup-retour-windows-secure-boot.png",
+   "ixin-os-setup-retour-windows.png",
+   "ixin-secure.png",
+   "menu-demarrage-ixin-windows.png",
+   "menu-demarrage-live.png"
+  ]
+ },
+ "update_policy_url": "https://hashcat-max.github.io/IXIN-GROUP/repo/policy.json",
+ "signing_key_fingerprint": "74DF FA0C 6B29 1E07 27EA  8A59 891C 90DD 6094 ABDF",
+ "source": "https://github.com/hashcat-max/IXIN-GROUP"
+}
