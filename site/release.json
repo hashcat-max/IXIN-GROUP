@@ -1,0 +1,38 @@
+{
+ "tag_name": "build-2026.10.17-5",
+ "name": "IXIN OS build-2026.10.17-5",
+ "published_at": "2026-10-17T00:39:03Z",
+ "html_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.17-5",
+ "assets": [
+  {
+   "name": "ixin-os-2026.10.17-x86_64.iso.part00",
+   "size": 1992294400,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/ixin-os-2026.10.17-x86_64.iso.part00",
+   "digest": "sha256:1e093aa9705f4b394c4114fe4c72b4cd9df9f2ec893019ec802666d78e7bc6a7"
+  },
+  {
+   "name": "ixin-os-2026.10.17-x86_64.iso.part01",
+   "size": 1992294400,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/ixin-os-2026.10.17-x86_64.iso.part01",
+   "digest": "sha256:e510c974e7dbcd4852ebab2674f929b207348d85b57de401d442f59a4506a371"
+  },
+  {
+   "name": "ixin-os-2026.10.17-x86_64.iso.part02",
+   "size": 1078849536,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/ixin-os-2026.10.17-x86_64.iso.part02",
+   "digest": "sha256:bf0a1dc3fbc032af30fcd7bd645d797c34e8248f3758314c9a185b97e610810d"
+  },
+  {
+   "name": "ixin-os-2026.10.17-x86_64.iso.sha256",
+   "size": 96,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/ixin-os-2026.10.17-x86_64.iso.sha256",
+   "digest": "sha256:5754255cdb3eb5e1db031f06ede8b1a1d112cd3cd4eb4f1813fd05299430848b"
+  },
+  {
+   "name": "IXIN-OS-Setup.exe",
+   "size": 3774976,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.17-5/IXIN-OS-Setup.exe",
+   "digest": "sha256:7dfcacc1773e1f71051a1a654599afce3b1e74a1b8961927beea7b73e3734c02"
+  }
+ ]
+}
