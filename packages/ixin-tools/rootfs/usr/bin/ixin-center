@@ -454,6 +454,24 @@ class Center(QMainWindow):
             button("Profil énergie : Équilibré", lambda: launch("powerprofilesctl", "set", "balanced")),
             button("Paramètres NVIDIA", lambda: launch("nvidia-settings")),
         ]))
+        v.addSpacing(14)
+        anti = QLabel("<b>Jeux dont l'anti-triche exige Windows</b> (Valorant, Fortnite, certains Call of Duty, "
+                      "Rainbow Six Siege…) : ils ne fonctionnent sur aucun système Linux. Avec Windows installé à côté "
+                      "d'IXIN OS, un clic redémarre directement sur Windows, avec Secure Boot et l'anti-triche intacts ; "
+                      "au redémarrage suivant, vous revenez sur IXIN OS. Pour vérifier un jeu : protondb.com.")
+        anti.setWordWrap(True)
+        anti.setObjectName("sub")
+        v.addWidget(anti)
+        has_windows = subprocess.run(["ixin-windows", "--check"], capture_output=True).returncode == 0 \
+            if shutil.which("ixin-windows") else False
+        play = button("Jouer sous Windows (Valorant, Fortnite…)", lambda: launch("ixin-windows"), has_windows)
+        play.setEnabled(has_windows and not IS_LIVE)
+        if not has_windows:
+            play.setToolTip("Windows n'est pas installé sur ce PC")
+        v.addWidget(grid([
+            play,
+            button("Vérifier un jeu (protondb.com)", lambda: QDesktopServices.openUrl(QUrl("https://www.protondb.com"))),
+        ]))
         v.addStretch(1)
         return w
 

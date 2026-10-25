@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Jouer sous Windows
+Name[en]=Play on Windows
+GenericName=Redémarrer sur Windows
+Comment=Redémarre directement sur Windows, une seule fois (jeux dont l'anti-triche exige Windows)
+Comment[en]=Restart straight into Windows, once (games whose anti-cheat requires Windows)
+Exec=ixin-windows
+Icon=system-reboot
+Terminal=false
+Categories=Game;System;
+Keywords=windows;valorant;fortnite;anti-triche;anticheat;dual boot;redémarrer;

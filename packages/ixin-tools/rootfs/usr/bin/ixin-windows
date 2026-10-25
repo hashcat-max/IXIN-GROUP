@@ -1,0 +1,63 @@
+#!/bin/sh
+# IXIN OS — « Jouer sous Windows » : redémarre directement sur Windows, une seule fois.
+#
+# Pour les jeux dont l'anti-triche n'accepte que Windows (Valorant, Fortnite, Call of Duty…) :
+# Windows démarre comme d'habitude (Secure Boot, TPM et anti-triche intacts) ; au redémarrage
+# suivant, le PC revient tout seul sur le menu IXIN.
+#
+#   ixin-windows [nom du jeu]      demande confirmation puis redémarre
+#   ixin-windows --check           code 0 si Windows est présent sur ce PC
+#   ixin-windows --yes [nom]       sans confirmation
+set -u
+
+if [ ! -s /var/lib/ixin/windows ] && ! grep -qsE -- "--class windows" /boot/grub/grub.cfg 2>/dev/null; then
+    present=0
+else
+    present=1
+fi
+[ "${1:-}" = --check ] && { [ "$present" = 1 ]; exit $?; }
+
+ask=1
+[ "${1:-}" = --yes ] && { ask=0; shift; }
+game="${1:-}"
+
+say() {   # say <--sorry|--error|--yesno> <message> [options kdialog] : fenêtre sur le bureau, sinon terminal
+    if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v kdialog >/dev/null; then
+        kdialog --title "Jouer sous Windows" "$@"
+        return
+    fi
+    printf '%s\n' "$2"
+    if [ "$1" = --yesno ]; then
+        printf 'Continuer ? [o/N] '
+        read -r answer
+        case "$answer" in o|O|oui|y|Y) return 0 ;; *) return 1 ;; esac
+    fi
+}
+
+if [ "$present" = 0 ]; then
+    say --sorry "Windows n'est pas installé sur ce PC (ou n'a pas été trouvé).
+
+Les jeux dont l'anti-triche n'accepte que Windows (Valorant, Fortnite…) ne fonctionnent sur aucun système Linux. Pour y jouer, installez IXIN OS à côté de Windows."
+    exit 1
+fi
+
+what="${game:+pour jouer à $game}"
+if [ "$ask" = 1 ]; then
+    say --yesno "Redémarrer maintenant sur Windows ${what} ?
+
+Enregistrez d'abord votre travail : les applications ouvertes seront fermées.
+Pour revenir à IXIN OS, redémarrez simplement Windows : le menu IXIN réapparaît." \
+        --yes-label "Redémarrer sur Windows" --no-label "Annuler" || exit 0
+fi
+
+if ! out="$(pkexec /usr/lib/ixin/ixin-boot-windows 2>&1)"; then
+    say --error "Impossible de préparer le démarrage de Windows :
+$out"
+    exit 1
+fi
+echo "$out"
+
+# Fermeture propre de la session puis redémarrage (KDE), sinon redémarrage direct
+qdbus6 org.kde.Shutdown /Shutdown logoutAndReboot 2>/dev/null ||
+    qdbus org.kde.Shutdown /Shutdown logoutAndReboot 2>/dev/null ||
+    systemctl reboot

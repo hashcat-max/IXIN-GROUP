@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>IXIN Group</vendor>
+  <vendor_url>https://getixin.com</vendor_url>
+  <icon_name>ixin</icon_name>
+  <!-- « Jouer sous Windows » : désigner Windows pour le prochain démarrage. Autorisé sans mot de passe à
+       l'utilisateur présent devant le PC, comme « Redémarrer » ; rien d'autre n'est modifié. -->
+  <action id="org.ixin.windows.boot">
+    <description>Restart into Windows once</description>
+    <description xml:lang="fr">Redémarrer une fois sur Windows</description>
+    <message>Authentication is required to restart into Windows</message>
+    <message xml:lang="fr">Authentification requise pour redémarrer sur Windows</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/ixin/ixin-boot-windows</annotate>
+  </action>
+</policyconfig>

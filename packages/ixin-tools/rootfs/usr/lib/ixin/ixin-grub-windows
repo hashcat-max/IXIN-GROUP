@@ -6,6 +6,8 @@
 # chargeur de Windows. Sans entrée du firmware, GRUB lance Windows directement.
 #
 #   --menu        l'entrée du menu (appelé par /etc/grub.d/26_ixin_windows)
+#   --uuid        identifiant de la partition EFI de Windows (entrée GRUB « ixin-windows-<uuid> »)
+#   --bootnum     numéro de l'entrée « Windows » du firmware (UEFI), s'il y en a une
 #   --skip-list   ce Windows, pour qu'os-prober ne l'ajoute pas une seconde fois
 #                 (/etc/default/grub.d/ixin-windows.cfg)
 #
@@ -43,7 +45,26 @@ fi
 uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null)"
 [ -n "$uuid" ] || exit 0
 
+# Windows trouvé : noté pour « Jouer sous Windows » (ixin-windows), lisible sans droits
+if [ "${1:-}" = --menu ] && [ -d /var/lib ]; then
+    mkdir -p /var/lib/ixin 2>/dev/null &&
+        printf 'uuid=%s\n' "$uuid" > /var/lib/ixin/windows 2>/dev/null &&
+        chmod 644 /var/lib/ixin/windows 2>/dev/null
+fi
+
 case "${1:-}" in
+--uuid)
+    echo "$uuid"
+    ;;
+--bootnum)
+    # Entrée « Windows Boot Manager » du firmware (UEFI), pour démarrer Windows une seule fois
+    [ -d /sys/firmware/efi ] || exit 1
+    partuuid="$(blkid -s PARTUUID -o value "$dev" 2>/dev/null | tr 'A-Z' 'a-z')"
+    num="$(efibootmgr -v 2>/dev/null | tr 'A-Z\\' 'a-z/' |
+        sed -n "s|^boot\([0-9a-f]\{4\}\)\*\{0,1\} .*gpt,$partuuid,.*/efi/microsoft/boot/bootmgfw\.efi.*|\1|p" | head -n 1)"
+    [ -n "$num" ] || exit 1
+    echo "$num"
+    ;;
 --skip-list)
     echo "$uuid@$LOADER"
     ;;

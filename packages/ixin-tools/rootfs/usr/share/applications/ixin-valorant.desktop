@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Valorant (sous Windows)
+Name[en]=Valorant (on Windows)
+Comment=L'anti-triche de Valorant n'accepte que Windows : redémarre directement sur Windows pour jouer
+Comment[en]=Valorant's anti-cheat only accepts Windows: restart straight into Windows to play
+Exec=ixin-windows Valorant
+Icon=applications-games
+Terminal=false
+Categories=Game;
+Keywords=valorant;riot;vanguard;windows;

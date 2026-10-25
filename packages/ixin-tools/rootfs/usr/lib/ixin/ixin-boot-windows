@@ -1,0 +1,33 @@
+#!/bin/sh
+# IXIN OS — démarrer Windows au prochain démarrage, une seule fois (« Jouer sous Windows »)
+#
+# Lancé en administrateur par ixin-windows (pkexec, action org.ixin.windows.boot) : il ne fait que
+# désigner Windows pour le PROCHAIN démarrage, sans rien changer d'autre. Ensuite, le PC revient
+# tout seul sur le menu IXIN.
+#   1. PC UEFI : entrée « Windows Boot Manager » du firmware (BootNext) — Windows démarre exactement
+#      comme sans IXIN (BitLocker ne demande pas sa clé, Secure Boot/TPM inchangés pour les anti-triches) ;
+#   2. sinon (BIOS, entrée absente) : entrée « Windows » du menu GRUB (grub-reboot).
+set -u
+PATH=/usr/bin:/usr/sbin
+
+num="$(/usr/lib/ixin/ixin-grub-windows --bootnum 2>/dev/null)"
+if [ -n "$num" ] && efibootmgr -q -n "$num"; then
+    echo "Prochain démarrage : Windows (entrée Boot$num du firmware)"
+    exit 0
+fi
+
+cfg=/boot/grub/grub.cfg
+[ -r "$cfg" ] || { echo "Menu de démarrage introuvable ($cfg)" >&2; exit 1; }
+uuid="$(/usr/lib/ixin/ixin-grub-windows --uuid 2>/dev/null)"
+id=""
+if [ -n "$uuid" ] && grep -q "'ixin-windows-$uuid'" "$cfg"; then
+    id="ixin-windows-$uuid"
+else
+    # Entrée ajoutée par os-prober (PC en mode BIOS) : « menuentry 'Windows …' --class windows … 'osprober-…' »
+    id="$(grep -E "^menuentry .*--class windows" "$cfg" | head -n 1 |
+          sed -n "s/.*\$menuentry_id_option '\([^']*\)'.*/\1/p")"
+fi
+[ -n "$id" ] || { echo "Windows est introuvable dans le menu de démarrage" >&2; exit 1; }
+[ -f /boot/grub/grubenv ] || grub-editenv /boot/grub/grubenv create
+grub-reboot "$id" || exit 1
+echo "Prochain démarrage : Windows (menu GRUB, entrée $id)"
