@@ -16,7 +16,13 @@ PREFIX=/ucrt64
 STAGE="$(mktemp -d)/ixin-vm-engine"
 mkdir -p "$STAGE/share" "$OUT"
 
-pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-qemu mingw-w64-ucrt-x86_64-ntldd >/dev/null
+# Miroirs MSYS2 parfois lents ou indisponibles : jusqu'à 5 essais
+for try in 1 2 3 4 5; do
+  pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-qemu mingw-w64-ucrt-x86_64-ntldd >/dev/null && break
+  [ "$try" = 5 ] && { echo "Installation de QEMU impossible (miroirs MSYS2)" >&2; exit 1; }
+  echo "Miroir MSYS2 en échec, nouvel essai dans $((try * 15)) s" >&2
+  sleep $((try * 15))
+done
 version="$(pacman -Q mingw-w64-ucrt-x86_64-qemu | awk '{print $2}')"
 
 # Programmes
