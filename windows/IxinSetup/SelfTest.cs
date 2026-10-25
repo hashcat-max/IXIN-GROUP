@@ -359,7 +359,10 @@ namespace IxinSetup
                 string serial = Path.Combine(root, "serie.txt");
                 using (var p = vm.StartHeadless(4 * Facts.GiB, 2, serial))
                 {
+                    var err = p.StandardError.ReadToEndAsync();
+                    var outp = p.StandardOutput.ReadToEndAsync();
                     bool exited = p.WaitForExit(40000);
+                    if (exited) Console.WriteLine("  QEMU : " + (outp.Result + err.Result).Trim());
                     Expect(!exited, exited ? $"PC virtuel arrêté trop tôt (code {p.ExitCode})" : "PC virtuel démarré (firmware UEFI)");
                     if (!exited) { p.Kill(); p.WaitForExit(10000); }
                 }

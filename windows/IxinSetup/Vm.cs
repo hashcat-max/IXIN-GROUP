@@ -279,7 +279,11 @@ $s.Save()", new Hashtable
         /// <summary>Démarre le PC virtuel sans fenêtre (tests) ; renvoie le processus.</summary>
         public Process StartHeadless(long ram, int cores, string serialLog)
         {
-            var psi = new ProcessStartInfo(QemuConsole, Arguments(ram, cores, true, serialLog)) { UseShellExecute = false, CreateNoWindow = true };
+            var psi = new ProcessStartInfo(QemuConsole, Arguments(ram, cores, true, serialLog))
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true,
+            };
+            Log.Info("qemu-system-x86_64 " + psi.Arguments);
             return Process.Start(psi);
         }
     }
