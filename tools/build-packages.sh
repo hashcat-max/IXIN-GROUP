@@ -8,6 +8,8 @@
 #    IXIN_SIGNING_KEY            clé privée OpenPGP (texte ASCII) — secret GitHub
 #    IXIN_SIGNING_KEY_FILE       … ou chemin vers ce fichier
 #    IXIN_SIGNING_KEY_PASSPHRASE phrase de passe de la clé (facultatif)
+#    IXIN_SECUREBOOT_KEY         clé Secure Boot (PEM) — secret GitHub ; ou IXIN_SECUREBOOT_KEY_FILE
+#    IXIN_SECUREBOOT_CERT        certificat (défaut : repo/secureboot/ixin-secureboot.crt)
 #    IXIN_ALLOW_UNSIGNED=1       construction non signée (tests uniquement)
 #    IXIN_REUSE_DIR              paquets déjà publiés : une version inchangée est
 #                                réutilisée telle quelle (fichier identique)
@@ -82,6 +84,27 @@ else
 fi
 rm -f "$K/extra-keys.asc"
 
+# ── 2b. Secure Boot (clé IXIN_SECUREBOOT_KEY + certificat repo/secureboot/ixin-secureboot.crt) ──
+SB_CRT="${IXIN_SECUREBOOT_CERT:-$ROOT/repo/secureboot/ixin-secureboot.crt}"
+SB_KEY=""
+if [[ -n "${IXIN_SECUREBOOT_KEY:-}" ]]; then
+  SB_KEY="$WORK/secureboot.key"
+  (umask 077; printf '%s\n' "$IXIN_SECUREBOOT_KEY" > "$SB_KEY")
+elif [[ -n "${IXIN_SECUREBOOT_KEY_FILE:-}" ]]; then
+  SB_KEY="$IXIN_SECUREBOOT_KEY_FILE"
+fi
+if [[ -n "$SB_KEY" && -f "$SB_CRT" ]]; then
+  pacman -S --needed --noconfirm --color never sbsigntools >/dev/null 2>&1
+  [[ "$(openssl x509 -in "$SB_CRT" -noout -modulus)" == "$(openssl rsa -in "$SB_KEY" -noout -modulus 2>/dev/null)" ]] ||
+    die "la clé Secure Boot ne correspond pas au certificat $SB_CRT"
+  msg "Secure Boot : fichiers EFI signés (shim, MokManager, GRUB d'IXIN)"
+  "$ROOT/tools/build-secureboot-efi.sh" "$WORK/packages/ixin-secureboot/efi" "$SB_KEY" "$SB_CRT" | tail -n 1
+else
+  msg "Secure Boot : pas de clé (secret IXIN_SECUREBOOT_KEY) ou de certificat — ixin-secureboot et le noyau signé ne sont pas construits"
+  rm -rf "$WORK/packages/ixin-secureboot"
+  SB_KEY=""
+fi
+
 # ── 3. Construction ──────────────────────────────────────────────────────────
 pacman -S --needed --noconfirm --color never grub ttf-dejavu plymouth >/dev/null 2>&1
 id "$BUILD_USER" &>/dev/null || useradd -m "$BUILD_USER"
@@ -92,6 +115,10 @@ for dir in "$WORK"/packages/*/; do
   (cd "$dir" && sudo -u "$BUILD_USER" env PKGDEST="$WORK/pkgout" SRCDEST="$WORK/src" \
      makepkg --force --nodeps --noconfirm --cleanbuild >/dev/null) || die "échec de construction : $(basename "$dir")"
 done
+if [[ -n "$SB_KEY" ]]; then
+  msg "Noyau signé pour Secure Boot (linux-zen d'Arch Linux → linux-zen-ixin)"
+  "$ROOT/tools/build-signed-kernel.sh" "$WORK/pkgout" "$SB_KEY" "$SB_CRT"
+fi
 
 # ── 4. Dépôt signé ───────────────────────────────────────────────────────────
 mkdir -p "$OUT"

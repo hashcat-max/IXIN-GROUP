@@ -1,0 +1,18 @@
+# Maintainer: IXIN Group <https://getixin.com>
+# Version calculée automatiquement par tools/build-packages.sh (date du dernier commit du paquet).
+# Le dossier efi/ (shim, MokManager, GRUB signé, certificat) est produit au moment de la construction
+# par tools/build-secureboot-efi.sh avec la clé Secure Boot d'IXIN : sans elle, ce paquet n'est pas construit.
+pkgname=ixin-secureboot
+pkgver=0
+pkgrel=1
+pkgdesc="IXIN OS avec Secure Boot activé : shim, MokManager et GRUB signé par IXIN"
+arch=('x86_64')
+url="https://github.com/hashcat-max/IXIN-GROUP"
+license=('LicenseRef-IXIN' 'BSD-2-Clause' 'GPL-3.0-or-later')
+depends=('efibootmgr' 'mokutil')
+install=ixin-secureboot.install
+
+package() {
+  cp -a "$startdir/rootfs/." "$pkgdir/"
+  install -Dm644 -t "$pkgdir/usr/lib/ixin/secureboot" "$startdir"/efi/*
+}

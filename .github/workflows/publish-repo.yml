@@ -30,8 +30,9 @@ on:
   # Appelé par « Construire l'ISO » après chaque version publiée : flux du site à jour
   workflow_call:
   schedule:
-    # Chaque lundi : nouvelle signature de la politique (valable 14 jours)
-    - cron: "17 4 * * 1"
+    # Toutes les 6 heures : noyau signé à jour (nouvelle version du noyau d'Arch Linux) et nouvelle
+    # signature de la politique (valable 14 jours) ; les paquets inchangés sont republiés à l'identique
+    - cron: "17 */6 * * *"
 
 permissions:
   contents: write   # branche ixin-repo
@@ -81,9 +82,10 @@ jobs:
         env:
           IXIN_SIGNING_KEY: ${{ secrets.IXIN_SIGNING_KEY }}
           IXIN_SIGNING_KEY_PASSPHRASE: ${{ secrets.IXIN_SIGNING_KEY_PASSPHRASE }}
+          IXIN_SECUREBOOT_KEY: ${{ secrets.IXIN_SECUREBOOT_KEY }}
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE":/src \
-            -e IXIN_SIGNING_KEY -e IXIN_SIGNING_KEY_PASSPHRASE -e IXIN_REUSE_DIR=/src/prev \
+            -e IXIN_SIGNING_KEY -e IXIN_SIGNING_KEY_PASSPHRASE -e IXIN_SECUREBOOT_KEY -e IXIN_REUSE_DIR=/src/prev \
             archlinux:latest bash -c '
               set -e
               pacman-key --init >/dev/null && pacman-key --populate archlinux >/dev/null
@@ -111,6 +113,10 @@ jobs:
           # Dépôt git séparé (hors du site : GitHub Pages ne doit pas recevoir de dossier .git)
           export GIT_DIR="$RUNNER_TEMP/ixin-repo.git" GIT_WORK_TREE="$RUNNER_TEMP/site"
           git init -q -b ixin-repo
+          # git refuse les fichiers de plus de 100 Mo (paquets du noyau signé) : servis par GitHub Pages seulement
+          mkdir -p "$GIT_DIR/info"
+          (cd "$GIT_WORK_TREE" && find . -type f -size +95M | sed 's|^\./|/|') > "$GIT_DIR/info/exclude"
+          if [ -s "$GIT_DIR/info/exclude" ]; then echo "Hors de la branche (trop gros) :"; cat "$GIT_DIR/info/exclude"; fi
           git add -A
           serial="$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/site/repo/policy.json'))['serial'])")"
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \

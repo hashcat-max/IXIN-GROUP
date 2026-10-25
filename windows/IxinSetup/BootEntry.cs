@@ -21,6 +21,7 @@ namespace IxinSetup
         public const string LoaderPath = @"\EFI\IXIN-SETUP\grubx64.efi";
         public const string OptionsFile = "options.cfg";   // options de l'installation, lues par le menu de démarrage
         public const string IxinLoaderPath = @"\EFI\IXIN\grubx64.efi";   // IXIN OS installé (son menu GRUB)
+        public const string IxinShimPath = @"\EFI\IXIN\shimx64.efi";     // IXIN OS installé, compatible Secure Boot
         private const string FwBootMgr = "{a5a30fa2-3d06-4e9f-b5f4-a01df9d1fcba}";  // {fwbootmgr} affiché en entier (/v)
         private static readonly Regex Guid = new Regex(@"\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}");
 
@@ -180,7 +181,8 @@ namespace IxinSetup
         /// <summary>Entrées du firmware qui démarrent IXIN OS installé.</summary>
         public static List<string> FindIxin()
         {
-            return ParseEntries(Run("bcdedit.exe", "/enum firmware /v", check: false), IxinLoaderPath);
+            string output = Run("bcdedit.exe", "/enum firmware /v", check: false);
+            return ParseEntries(output, IxinShimPath).Concat(ParseEntries(output, IxinLoaderPath)).Distinct().ToList();
         }
 
         /// <summary>Première entrée de l'ordre de démarrage du firmware (null si inconnue).</summary>

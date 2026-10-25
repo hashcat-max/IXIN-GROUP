@@ -1,0 +1,96 @@
+#!/bin/sh
+# IXIN OS — chargeur de démarrage compatible Secure Boot
+#
+#   ixin-secureboot install   installe shim (signé par Microsoft), MokManager et le GRUB d'IXIN (signé
+#                             par IXIN) dans la partition EFI, et en fait l'entrée « IXIN OS » du firmware
+#   ixin-secureboot update    idem, seulement si la partition EFI l'utilise déjà (mises à jour)
+#   ixin-secureboot status    état de Secure Boot et de la clé IXIN
+#   ixin-secureboot enroll    demande l'enregistrement de la clé IXIN (MokManager, au prochain démarrage)
+#
+# Chaîne : firmware → \EFI\IXIN\shimx64.efi → grubx64.efi (IXIN) → /boot/grub/grub.cfg → noyau
+# linux-zen-ixin (signé). Sans Secure Boot, la même chaîne démarre aussi (shim ne vérifie alors rien).
+set -u
+PATH=/usr/bin:/usr/sbin
+SRC=/usr/lib/ixin/secureboot
+CER="$SRC/ixin-secureboot.cer"
+MOK_PASSWORD=ixinos         # mot de passe d'un seul usage demandé par MokManager (affiché à l'écran)
+
+die(){ echo "ixin-secureboot : $*" >&2; exit 1; }
+
+esp_dir() {
+    for d in /boot/efi /efi /boot; do
+        [ "$(findmnt -no FSTYPE --mountpoint "$d" 2>/dev/null)" = vfat ] && { echo "$d"; return 0; }
+    done
+    return 1
+}
+
+sb_enabled() { mokutil --sb-state 2>/dev/null | grep -q enabled; }
+key_enrolled() { mokutil --test-key "$CER" 2>/dev/null | grep -q "already enrolled"; }
+
+install_chain() {
+    [ -d /sys/firmware/efi ] || { echo "PC en mode BIOS : Secure Boot ne s'applique pas"; return 0; }
+    [ -f "$SRC/shimx64.efi" ] && [ -f "$SRC/grubx64.efi" ] || die "fichiers absents de $SRC"
+    esp="$(esp_dir)" || die "partition EFI introuvable (montée sur /boot/efi ou /efi ?)"
+    dest="$esp/EFI/IXIN"
+    mkdir -p "$dest"
+    for f in shimx64.efi mmx64.efi fbx64.efi grubx64.efi; do
+        cp "$SRC/$f" "$dest/$f.new" && mv "$dest/$f.new" "$dest/$f"
+    done
+    cp "$CER" "$dest/ixin-secureboot.cer"
+    # Pour fbx64.efi (shim) : recrée l'entrée « IXIN OS » si un firmware l'efface
+    printf 'shimx64.efi,IXIN OS,,Démarrer IXIN OS\n' | iconv -f UTF-8 -t UCS-2LE > "$dest/BOOTX64.CSV" 2>/dev/null || true
+    # Repère qui permet au GRUB signé de retrouver la partition /boot d'IXIN OS
+    mkdir -p /boot/grub && touch /boot/grub/ixin-boot
+
+    # Chemin de secours du firmware : remplacé seulement s'il contient le GRUB d'IXIN (jamais celui de Windows)
+    fb="$esp/EFI/BOOT/BOOTX64.EFI"
+    if [ -f "$fb" ] && ! grep -qa "Microsoft" "$fb" && grep -qa "GRUB" "$fb"; then
+        cp "$dest/shimx64.efi" "$fb"
+        cp "$dest/mmx64.efi" "$dest/grubx64.efi" "$esp/EFI/BOOT/"
+    fi
+
+    # Entrée « IXIN OS » du firmware vers shim (les anciennes entrées vers le GRUB non signé sont retirées)
+    disk_part="$(findmnt -no SOURCE --mountpoint "$esp")"
+    disk="/dev/$(lsblk -no PKNAME "$disk_part" | head -n 1)"
+    part="$(cat "/sys/class/block/$(basename "$disk_part")/partition" 2>/dev/null)"
+    if ! efibootmgr -v 2>/dev/null | tr 'A-Z\\' 'a-z/' | grep -q '/efi/ixin/shimx64.efi'; then
+        for n in $(efibootmgr -v 2>/dev/null | tr 'A-Z\\' 'a-z/' | sed -n 's|^boot\([0-9a-f]\{4\}\)\*\{0,1\} .*/efi/ixin/grubx64.efi.*|\1|p'); do
+            efibootmgr -q -b "$n" -B || true
+        done
+        efibootmgr -q -c -d "$disk" -p "$part" -L "IXIN OS" -l '\EFI\IXIN\shimx64.efi' || die "entrée du firmware impossible à créer"
+    fi
+    echo "Chargeur compatible Secure Boot installé dans $dest"
+}
+
+case "${1:-}" in
+install)
+    install_chain
+    if [ -d /sys/firmware/efi ] && sb_enabled && ! key_enrolled; then
+        "$0" enroll
+    fi
+    ;;
+update)
+    esp="$(esp_dir)" || exit 0
+    [ -f "$esp/EFI/IXIN/shimx64.efi" ] || exit 0
+    install_chain
+    ;;
+enroll)
+    key_enrolled && { echo "La clé Secure Boot d'IXIN est déjà enregistrée."; exit 0; }
+    hash="$(mktemp)"
+    mokutil --generate-hash="$MOK_PASSWORD" > "$hash" || die "mokutil indisponible"
+    mokutil --import "$CER" --hash-file "$hash" >/dev/null || { rm -f "$hash"; die "demande d'enregistrement refusée"; }
+    rm -f "$hash"
+    echo "Au prochain démarrage, un écran bleu « MokManager » s'affiche : Enroll MOK → Continue → Yes,"
+    echo "puis le mot de passe « $MOK_PASSWORD », puis Reboot."
+    ;;
+status)
+    if [ ! -d /sys/firmware/efi ]; then echo "Mode BIOS : pas de Secure Boot"; exit 0; fi
+    sb_enabled && echo "Secure Boot : activé" || echo "Secure Boot : désactivé"
+    key_enrolled && echo "Clé IXIN : enregistrée" || echo "Clé IXIN : non enregistrée"
+    esp="$(esp_dir)" && [ -f "$esp/EFI/IXIN/shimx64.efi" ] && echo "Chargeur : shim + GRUB signé (\\EFI\\IXIN)" || echo "Chargeur : non signé"
+    ;;
+*)
+    echo "usage : $0 install|update|status|enroll" >&2
+    exit 2
+    ;;
+esac

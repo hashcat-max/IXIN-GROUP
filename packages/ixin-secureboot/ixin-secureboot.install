@@ -1,0 +1,11 @@
+post_install() {
+  # Pendant la construction de l'ISO ou l'installation (chroot), ixin-postinstall s'en charge
+  [ -d run/systemd/system ] || return 0
+  usr/bin/systemd-detect-virt --chroot >/dev/null 2>&1 && return 0
+  [ -d run/archiso ] && return 0
+  usr/lib/ixin/ixin-secureboot install || true
+}
+
+post_upgrade() {
+  post_install
+}

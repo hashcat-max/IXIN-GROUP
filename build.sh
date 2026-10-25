@@ -80,8 +80,15 @@ done
 
 msg "Paquets IXIN (dépôt [ixin] signé)"
 "$ROOT/tools/build-packages.sh" "$BUILD/ixin-repo"
-rm -f "$REPO"/ixin-*.pkg.tar.zst "$REPO"/ixin-local.*
+rm -f "$REPO"/ixin-*.pkg.tar.zst "$REPO"/linux-zen-ixin-*.pkg.tar.zst "$REPO"/ixin-local.*
 cp "$BUILD/ixin-repo"/ixin-*.pkg.tar.zst "$REPO/"
+# Secure Boot : noyau signé et ixin-secureboot construits par build-packages.sh (clé IXIN_SECUREBOOT_KEY)
+SECUREBOOT=0
+if compgen -G "$BUILD/ixin-repo/linux-zen-ixin-[0-9]*.pkg.tar.zst" >/dev/null &&
+   compgen -G "$BUILD/ixin-repo/ixin-secureboot-*.pkg.tar.zst" >/dev/null; then
+    cp "$BUILD/ixin-repo"/linux-zen-ixin-*.pkg.tar.zst "$REPO/"
+    SECUREBOOT=1
+fi
 repo-add -q "$REPO/ixin-local.db.tar.gz" "$REPO"/*.pkg.tar.zst
 
 msg "Préparation du profil"
@@ -89,11 +96,26 @@ WORKPROFILE="$BUILD/profile"
 rm -rf "$WORKPROFILE"
 cp -a "$PROFILE" "$WORKPROFILE"
 sed -i "s|@LOCALREPO@|$REPO|" "$WORKPROFILE/pacman.conf"
+if [[ $SECUREBOOT == 1 ]]; then
+    msg "Secure Boot : noyau signé linux-zen-ixin, shim et GRUB signés"
+    sed -i 's/^linux-zen$/linux-zen-ixin/; s/^linux-zen-headers$/linux-zen-ixin-headers/' "$WORKPROFILE/packages.x86_64"
+    printf 'ixin-secureboot\nmokutil\n' >> "$WORKPROFILE/packages.x86_64"
+else
+    msg "Secure Boot : non pris en charge par cette construction (pas de clé IXIN_SECUREBOOT_KEY)"
+fi
 
 msg "Construction de l'ISO (cela peut prendre 30 à 90 minutes)"
 rm -rf "$BUILD/work"
 mkdir -p "$OUT"
 mkarchiso -v -w "$BUILD/work" -o "$OUT" "$WORKPROFILE"
+if [[ $SECUREBOOT == 1 ]]; then
+    # Démarrage UEFI avec Secure Boot : shim (signé Microsoft) devant systemd-boot signé par IXIN,
+    # dans l'arborescence de l'ISO et dans l'image FAT de démarrage ; puis l'ISO est refaite
+    # (mkarchiso reprend là où il en était et ne refait que l'image).
+    "$ROOT/tools/secureboot-iso.sh" "$BUILD/work" "$REPO"
+    rm -f "$OUT"/ixin-os-*.iso
+    mkarchiso -v -w "$BUILD/work" -o "$OUT" "$WORKPROFILE"
+fi
 rm -rf "$BUILD/work"
 
 cd "$OUT"

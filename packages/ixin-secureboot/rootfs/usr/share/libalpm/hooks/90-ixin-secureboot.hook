@@ -1,0 +1,12 @@
+# IXIN OS — remet à jour shim / GRUB signé dans la partition EFI quand ixin-secureboot change
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/ixin/secureboot/*
+
+[Action]
+Description = IXIN OS : chargeur de démarrage compatible Secure Boot…
+When = PostTransaction
+Exec = /usr/lib/ixin/ixin-secureboot update
+NeedsTargets
