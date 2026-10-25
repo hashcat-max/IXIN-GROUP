@@ -321,6 +321,64 @@ namespace IxinSetup
             return failures == 0 ? 0 : 1;
         }
 
+        // ── machine virtuelle IXIN ───────────────────────────────────────────
+
+        /// <summary>
+        /// Moteur de la machine virtuelle : installation depuis l'archive publiée, disque virtuel,
+        /// raccourcis, démarrage du PC virtuel (firmware UEFI, sans fenêtre), puis suppression.
+        /// </summary>
+        public static int RunVm(string engineZip)
+        {
+            failures = 0;
+            Console.WriteLine("IXIN OS Setup " + Program.Version + " — auto-test de la machine virtuelle");
+            string root = Path.Combine(Path.GetTempPath(), "ixin-vm-test");
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+            var vm = new Vm(Path.Combine(root, "vm"));
+            string desktop = Path.Combine(root, "bureau"), menu = Path.Combine(root, "menu");
+            Directory.CreateDirectory(desktop);
+            Directory.CreateDirectory(menu);
+            try
+            {
+                var f = Vm.Collect(vm.Folder);
+                Console.WriteLine("  " + f.Describe());
+                Expect(Vm.Checks(f).Count > 0, "vérifications de la machine virtuelle");
+                Expect(Vm.MemoryMb(16 * Facts.GiB) == 8192 && Vm.MemoryMb(4 * Facts.GiB) == 2048 && Vm.MemoryMb(8 * Facts.GiB) == 4096,
+                       "mémoire donnée à IXIN OS (moitié du PC, 2 à 8 Go)");
+                Expect(Vm.Processors(16) == 8 && Vm.Processors(2) == 2, "processeurs donnés à IXIN OS");
+
+                vm.InstallEngine(engineZip);
+                Expect(File.Exists(vm.Qemu) && File.Exists(vm.QemuImg), "moteur installé depuis " + Path.GetFileName(engineZip));
+                vm.CreateDisk();
+                Expect(File.Exists(vm.Disk) && new FileInfo(vm.Disk).Length < 16 << 20, "disque virtuel créé (fichier qui ne grossit qu'à l'usage)");
+                Expect(File.Exists(vm.Vars), "mémoire UEFI du PC virtuel créée");
+                vm.CreateShortcuts(8 * Facts.GiB, 4, desktop, menu);
+                Expect(File.Exists(Path.Combine(desktop, "IXIN OS.lnk")) && File.Exists(Path.Combine(menu, "IXIN OS.lnk")), "raccourcis « IXIN OS » créés");
+                string args = vm.Arguments(8 * Facts.GiB, 4);
+                Expect(args.Contains("-accel whpx") && args.Contains("-accel tcg") && args.Contains("bootindex=1"), "accélération de Windows, puis émulation");
+
+                string serial = Path.Combine(root, "serie.txt");
+                using (var p = vm.StartHeadless(4 * Facts.GiB, 2, serial))
+                {
+                    bool exited = p.WaitForExit(40000);
+                    Expect(!exited, exited ? $"PC virtuel arrêté trop tôt (code {p.ExitCode})" : "PC virtuel démarré (firmware UEFI)");
+                    if (!exited) { p.Kill(); p.WaitForExit(10000); }
+                }
+                string log = File.Exists(serial) ? File.ReadAllText(serial) : "";
+                Console.WriteLine("  sortie série : " + log.Length + " caractères");
+            }
+            catch (Exception ex)
+            {
+                Expect(false, "exception : " + ex);
+            }
+            finally
+            {
+                try { vm.Remove(); } catch (Exception ex) { Console.WriteLine("  suppression : " + ex.Message); }
+            }
+            Expect(!Directory.Exists(vm.Folder), "machine virtuelle supprimée");
+            Console.WriteLine(failures == 0 ? "AUTO-TEST DE LA MACHINE VIRTUELLE RÉUSSI" : $"{failures} échec(s)");
+            return failures == 0 ? 0 : 1;
+        }
+
         // ── tests sans disque ────────────────────────────────────────────────
 
         private static void UnitTests()

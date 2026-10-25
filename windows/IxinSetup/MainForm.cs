@@ -33,6 +33,8 @@ namespace IxinSetup
         private bool useLocalIso;
         private string localIsoPath;
         private readonly SetupOptions options = new SetupOptions();   // options avancées
+        private readonly Vm vm = new Vm();
+        private VmFacts vmFacts;
         private bool keySaved;
         private CancellationTokenSource running;
 
@@ -193,6 +195,12 @@ namespace IxinSetup
                 ShowError(ex.Message);
                 return;
             }
+            if (File.Exists(Vm.PendingFlag))
+            {
+                // Accélération activée puis PC redémarré : on reprend la machine virtuelle
+                ShowVmChecks();
+                return;
+            }
             if (afterRestart)
             {
                 // Rouvert automatiquement à l'ouverture de session : rien à dire si IXIN OS est installé
@@ -206,7 +214,8 @@ namespace IxinSetup
             }
             if (state != null && !state.Completed) ShowInterrupted();
             else if (state != null || ixinEntries.Count > 0) await ShowManage();
-            else ShowChecks();
+            else if (vm.Exists) ShowVmManage();
+            else ShowModeChoice();
         }
 
         private Control Busy(string title, string text)
@@ -233,7 +242,7 @@ namespace IxinSetup
                 buttons.Add(Action("Débloquer la réduction", async () => await UnblockShrink(), primary: true));
             else
                 buttons.Add(Action("Continuer", ShowOptions, primary: true, enabled: blocking.Count == 0));
-            buttons.Add(Action("Quitter", Close));
+            buttons.Add(Action("Retour", ShowModeChoice));
             buttons.Add(Action("Aide", () => Open(HelpUrl)));
             if (blocking.Count > 0 && !blocking.All(c => c.UnmovableFiles) && checks.Any(c => c.UnmovableFiles))
                 buttons.Insert(1, Action("Débloquer la réduction", async () => await UnblockShrink()));
@@ -863,6 +872,217 @@ namespace IxinSetup
                 Action("Plus tard", Close));
         }
 
+        // ── choix : à côté de Windows ou dans une fenêtre ────────────────────
+
+        private void ShowModeChoice()
+        {
+            var col = Theme.Column();
+            col.Controls.Add(Theme.Label("Comment voulez-vous utiliser IXIN OS ?", Theme.Title));
+            col.Controls.Add(ModeCard("À côté de Windows (recommandé)",
+                "IXIN OS s'installe sur une partie libre du disque. Au démarrage du PC, un menu permet de choisir IXIN OS ou Windows. " +
+                "Toute la puissance du PC : idéal pour les jeux et l'usage de tous les jours.", ShowChecks, true));
+            col.Controls.Add(ModeCard("Dans une fenêtre de Windows (machine virtuelle)",
+                "Le plus simple pour essayer : rien n'est modifié sur le disque ni au démarrage du PC, pas de Secure Boot à désactiver. " +
+                "IXIN OS s'ouvre comme une application, depuis une icône du bureau. Plus lent, et sans les jeux exigeants.", ShowVmChecks, false));
+            ShowPage(col, Action("Quitter", Close), Action("Aide", () => Open(HelpUrl)));
+        }
+
+        private Control ModeCard(string title, string text, Action onClick, bool primary)
+        {
+            var card = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true,
+                Padding = new Padding(16, 12, 16, 12), Margin = new Padding(0, 8, 0, 4), BackColor = Theme.Card, Cursor = Cursors.Hand,
+            };
+            var t = Theme.Label(title, Theme.Subtitle, primary ? Theme.Accent : Theme.Text);
+            var d = Theme.Label(text, null, Theme.Muted);
+            t.MaximumSize = d.MaximumSize = new Size(640, 0);
+            card.Controls.Add(t);
+            card.Controls.Add(d);
+            var go = Action(primary ? "Installer à côté de Windows" : "Utiliser IXIN OS dans une fenêtre", onClick, primary);
+            go.Margin = new Padding(0, 4, 0, 0);
+            card.Controls.Add(go);
+            foreach (Control c in new Control[] { card, t, d }) c.Click += (s, e) => onClick();
+            return card;
+        }
+
+        // ── machine virtuelle IXIN ────────────────────────────────────────────
+
+        private async void ShowVmChecks()
+        {
+            ShowPage(Busy("Machine virtuelle IXIN", "Vérification de la mémoire, de l'espace libre et de la virtualisation…"));
+            try
+            {
+                vmFacts = await Task.Run(() => Vm.Collect(vm.Folder));
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.ToString());
+                ShowError(ex.Message);
+                return;
+            }
+            var col = Theme.Column();
+            col.Controls.Add(Theme.Label("IXIN OS dans une fenêtre", Theme.Title));
+            col.Controls.Add(Theme.Label("IXIN OS Setup télécharge IXIN OS et le moteur de la machine virtuelle IXIN (environ 5 Go), crée un disque " +
+                                         "virtuel et une icône « IXIN OS » sur le bureau. Rien d'autre n'est installé, et rien n'est modifié sur le disque " +
+                                         "de Windows : tout tient dans un dossier, supprimable en un clic.", null, Theme.Muted));
+            var checks = Vm.Checks(vmFacts);
+            foreach (var c in checks) col.Controls.Add(CheckRow(c));
+            bool blocked = checks.Any(c => c.Level == CheckLevel.Blocking);
+            bool needPlatform = !vmFacts.PlatformEnabled && (vmFacts.VirtualizationEnabled || vmFacts.HypervisorPresent);
+            ShowPage(col,
+                needPlatform
+                    ? Action("Activer l'accélération et redémarrer", async () => await EnableVmAcceleration(), primary: true, enabled: !blocked)
+                    : Action("Préparer IXIN OS", async () => await RunVmPrepare(), primary: true, enabled: !blocked),
+                Action("Retour", ShowModeChoice),
+                Action("Aide", () => Open(HelpUrl + "#11-dans-une-fenêtre-machine-virtuelle")));
+        }
+
+        private async Task EnableVmAcceleration()
+        {
+            ShowPage(Busy("Activation de l'accélération…", "Ajout de la « Plateforme de l'hyperviseur Windows » (une à deux minutes)."));
+            try
+            {
+                bool restart = await Task.Run(() => Vm.EnablePlatform());
+                if (!restart)
+                {
+                    ShowVmChecks();
+                    return;
+                }
+                File.WriteAllText(Vm.PendingFlag, DateTime.Now.ToString("s"));
+                Followup.Arm();
+                var col = Theme.Column();
+                col.Controls.Add(Theme.Label("Redémarrage nécessaire", Theme.Title, Theme.Accent));
+                col.Controls.Add(Theme.Label("Windows doit redémarrer pour activer l'accélération. IXIN OS Setup se rouvrira tout seul ensuite " +
+                                             "et terminera la préparation d'IXIN OS."));
+                ShowPage(col,
+                    Action("Redémarrer maintenant", () => BootEntry.Run("shutdown.exe", "/r /t 5 /c \"Activation de l'accélération pour IXIN OS\""), primary: true),
+                    Action("Plus tard", Close));
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.ToString());
+                ShowError(ex.Message);
+            }
+        }
+
+        private async Task RunVmPrepare()
+        {
+            try { File.Delete(Vm.PendingFlag); } catch (IOException) { }
+            running = new CancellationTokenSource();
+            PrepareView view = null;
+            view = ShowPrepareView(() =>
+            {
+                running?.Cancel();
+                view.Step.Text = "Annulation en cours…";
+            });
+            Label stepLabel = view.Step, detail = view.Detail;
+            ProgressBar bar = view.Bar;
+            TextBox logBox = view.Log;
+            var step = new Progress<string>(m =>
+            {
+                stepLabel.Text = m;
+                logBox.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + m + Environment.NewLine);
+            });
+            var transfer = new Progress<Transfer>(t =>
+            {
+                bar.Value = t.Total > 0 ? (int)Math.Min(1000, t.Done * 1000 / t.Total) : 0;
+                string speed = t.BytesPerSecond > 0 ? $" — {t.BytesPerSecond / 1048576:0.0} Mo/s" : "";
+                string eta = t.BytesPerSecond > 0 && t.Total > t.Done ? $" — encore environ {Duration((t.Total - t.Done) / t.BytesPerSecond)}" : "";
+                detail.Text = $"{t.Stage} : {Facts.Gb(t.Done)} sur {Facts.Gb(t.Total)}{speed}{eta}";
+            });
+            var ct = running.Token;
+            try
+            {
+                await Task.Run(() =>
+                {
+                    IProgress<string> s = step;
+                    s.Report("Recherche de la dernière version d'IXIN OS…");
+                    var release = IsoSource.Latest(ct);
+                    s.Report("Téléchargement du moteur de la machine virtuelle…");
+                    string engine = IsoSource.DownloadAsset(release, Vm.EngineAsset, transfer, ct);
+                    s.Report($"Téléchargement d'IXIN OS ({release.Tag}, {Facts.Gb(release.IsoSize)})…");
+                    string iso = useLocalIso ? localIsoPath : IsoSource.Download(release, transfer, ct);
+                    if (useLocalIso) IsoSource.VerifyLocal(localIsoPath, transfer, ct);
+                    ct.ThrowIfCancellationRequested();
+                    s.Report("Installation du moteur…");
+                    vm.InstallEngine(engine);
+                    s.Report("Copie d'IXIN OS dans la machine virtuelle…");
+                    vm.PlaceIso(iso);
+                    s.Report("Création du disque virtuel…");
+                    vm.CreateDisk();
+                    s.Report("Création de l'icône « IXIN OS » sur le bureau…");
+                    vm.CreateShortcuts(vmFacts.Ram, vmFacts.Cores);
+                    if (!useLocalIso) { try { File.Delete(iso); } catch (IOException) { } }
+                    try { File.Delete(engine); } catch (IOException) { }
+                });
+                running = null;
+                ShowVmReady(firstTime: true);
+            }
+            catch (OperationCanceledException)
+            {
+                running = null;
+                ShowMessage("Préparation annulée", "Rien n'a été modifié sur le PC.");
+            }
+            catch (Exception ex)
+            {
+                running = null;
+                Log.Error(ex.ToString());
+                ShowError(ex.Message);
+            }
+        }
+
+        private void ShowVmReady(bool firstTime)
+        {
+            var col = Theme.Column();
+            col.Controls.Add(Theme.Label(firstTime ? "Tout est prêt !" : "IXIN OS (machine virtuelle)", Theme.Title, Theme.Accent));
+            if (firstTime)
+            {
+                col.Controls.Add(Theme.Label("IXIN OS s'ouvre dans une fenêtre. La première fois, installez-le dans la machine virtuelle (10 à 20 minutes) :"));
+                col.Controls.Add(Theme.Label("1.  Cliquez sur « Installer IXIN OS sur ce PC ».\n" +
+                                             "2.  À l'étape « Partitions », choisissez « Effacer le disque » : c'est le disque virtuel de 120 Go, " +
+                                             "vos fichiers Windows ne sont pas touchés.\n" +
+                                             "3.  Choisissez votre nom et votre mot de passe, puis « Installer ».\n" +
+                                             "4.  À la fin, redémarrez : IXIN OS démarre désormais directement.", null, Theme.Text));
+            }
+            col.Controls.Add(Theme.Label("Ensuite, lancez IXIN OS avec l'icône « IXIN OS » du bureau ou du menu Démarrer. Ctrl + Alt + F : plein écran ; " +
+                                         "Ctrl + Alt + G : libérer la souris.", Theme.Small, Theme.Muted));
+            ShowPage(col,
+                Action("Lancer IXIN OS", () => { vm.Launch(); Close(); }, primary: true),
+                Action("Plus tard", Close));
+        }
+
+        private void ShowVmManage()
+        {
+            var col = Theme.Column();
+            col.Controls.Add(Theme.Label("IXIN OS (machine virtuelle)", Theme.Title, Theme.Accent));
+            col.Controls.Add(Theme.Label("IXIN OS est prêt dans une machine virtuelle IXIN : lancez-le avec l'icône « IXIN OS » du bureau."));
+            col.Controls.Add(Theme.Label("« Installer à côté de Windows » garde la machine virtuelle. « Supprimer » efface la machine virtuelle et " +
+                                         "tout ce qu'elle contient (fichiers créés dans IXIN OS compris).", Theme.Small, Theme.Muted));
+            ShowPage(col,
+                Action("Lancer IXIN OS", () => { vm.Launch(); Close(); }, primary: true),
+                Action("Supprimer la machine virtuelle", async () => await RunVmRemove()),
+                Action("Installer à côté de Windows", ShowChecks),
+                Action("Quitter", Close));
+        }
+
+        private async Task RunVmRemove()
+        {
+            if (MessageBox.Show("Supprimer la machine virtuelle IXIN et tout ce qu'elle contient ?\n\nLes fichiers créés dans IXIN OS seront perdus.",
+                    "IXIN OS Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            ShowPage(Busy("Suppression de la machine virtuelle…", vm.Folder));
+            try
+            {
+                await Task.Run(() => vm.Remove());
+                ShowMessage("C'est fait", "La machine virtuelle IXIN a été supprimée.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.ToString());
+                ShowError(ex.Message);
+            }
+        }
+
         // ── préparation existante ─────────────────────────────────────────────
 
         private async Task ShowManage()
@@ -1003,6 +1223,21 @@ namespace IxinSetup
                     break;
                 case "installee":
                     ShowInstalled(false, 6 * Plan.GiB);
+                    break;
+                case "choix":
+                    ShowModeChoice();
+                    break;
+                case "vm-prete":
+                    ShowVmReady(firstTime: true);
+                    break;
+                case "vm-verification":
+                    vmFacts = new VmFacts { Ram = 16 * Plan.GiB, Cores = 8, VirtualizationEnabled = true, PlatformState = "Disabled", Free = 300 * Plan.GiB };
+                    {
+                        var col = Theme.Column();
+                        col.Controls.Add(Theme.Label("IXIN OS dans une fenêtre", Theme.Title));
+                        foreach (var c in Vm.Checks(vmFacts)) col.Controls.Add(CheckRow(c));
+                        ShowPage(col, Action("Activer l'accélération et redémarrer", () => { }, primary: true), Action("Retour", () => { }));
+                    }
                     break;
                 case "retour-windows":
                     ShowReturned();

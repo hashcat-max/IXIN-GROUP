@@ -27,6 +27,8 @@ namespace IxinSetup
         public string IsoName;
         public List<Asset> Parts = new List<Asset>();
         public Asset Checksum;
+        public List<Asset> All = new List<Asset>();   // tous les fichiers de la version
+        public Asset Find(string name) => All.FirstOrDefault(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase));
         public long IsoSize => Parts.Sum(p => p.Size);
     }
 
@@ -133,6 +135,7 @@ namespace IxinSetup
                     Size = Convert.ToInt64(d["size"]),
                 });
             }
+            info.All = assets;
             foreach (var asset in assets.OrderBy(x => x.Name, StringComparer.Ordinal))
             {
                 var m = IsoPart.Match(asset.Name);
@@ -163,13 +166,18 @@ namespace IxinSetup
         /// </summary>
         public static string Download(ReleaseInfo r, IProgress<Transfer> progress, CancellationToken ct)
         {
+            return DownloadParts(r, FetchChecksum(r, ct), progress, ct, "Téléchargement d'IXIN OS");
+        }
+
+        /// <summary>Télécharge les morceaux de r (r.IsoName) en un seul fichier vérifié (SHA-256 attendu).</summary>
+        private static string DownloadParts(ReleaseInfo r, string expected, IProgress<Transfer> progress, CancellationToken ct, string stage)
+        {
             Directory.CreateDirectory(DownloadDirectory);
             string iso = Path.Combine(DownloadDirectory, r.IsoName);
             string partial = iso + ".partiel";
             string stateFile = iso + ".progression";
             var ser = new JavaScriptSerializer();
 
-            string expected = FetchChecksum(r, ct);
             if (File.Exists(iso))
             {
                 if (Sha256(iso, progress, ct) == expected) return iso;
@@ -202,7 +210,7 @@ namespace IxinSetup
                         long before = st.Done[i];
                         try
                         {
-                            DownloadRange(part, i, offset, st, output, stateFile, ser, total, started, startedAt, progress, ct);
+                            DownloadRange(part, i, offset, st, output, stateFile, ser, total, started, startedAt, progress, ct, stage);
                         }
                         catch (Exception ex) when (!ct.IsCancellationRequested &&
                                                    (ex is IOException || ex is HttpRequestException || ex is WebException ||
@@ -247,7 +255,7 @@ namespace IxinSetup
         /// <summary>Une requête : le morceau <paramref name="i"/> depuis là où il s'est arrêté.</summary>
         private static void DownloadRange(Asset part, int i, long offset, DownloadProgress st, FileStream output, string stateFile,
                                           JavaScriptSerializer ser, long total, DateTime started, long startedAt,
-                                          IProgress<Transfer> progress, CancellationToken ct)
+                                          IProgress<Transfer> progress, CancellationToken ct, string stage)
         {
             using (var req = new HttpRequestMessage(HttpMethod.Get, part.Url))
             {
@@ -295,7 +303,7 @@ namespace IxinSetup
                                     double seconds = Math.Max(1, (DateTime.UtcNow - started).TotalSeconds);
                                     progress?.Report(new Transfer
                                     {
-                                        Stage = "Téléchargement d'IXIN OS",
+                                        Stage = stage,
                                         Done = st.Done.Sum(),
                                         Total = total,
                                         BytesPerSecond = (st.Done.Sum() - startedAt) / seconds,
@@ -310,6 +318,22 @@ namespace IxinSetup
             }
             output.Flush(true);
             File.WriteAllText(stateFile, ser.Serialize(st));
+        }
+
+        /// <summary>
+        /// Télécharge un fichier de la version (avec reprise) et le vérifie avec son « &lt;nom&gt;.sha256 ».
+        /// </summary>
+        public static string DownloadAsset(ReleaseInfo r, string name, IProgress<Transfer> progress, CancellationToken ct)
+        {
+            var asset = r.Find(name) ?? throw new SetupException($"La version {r.Tag} ne contient pas {name}.");
+            var sum = r.Find(name + ".sha256") ?? throw new SetupException($"La version {r.Tag} n'a pas d'empreinte pour {name} : téléchargement refusé.");
+            string expected = ParseChecksum(Client.GetStringAsync(sum.Url).GetAwaiter().GetResult(), name)
+                              ?? throw new SetupException($"Empreinte de {name} illisible.");
+            var single = new ReleaseInfo { Tag = r.Tag + "/" + name, IsoName = name, Parts = { asset } };
+            Directory.CreateDirectory(DownloadDirectory);
+            string path = Path.Combine(DownloadDirectory, name);
+            if (File.Exists(path) && Sha256(path, null, ct) == expected) return path;
+            return DownloadParts(single, expected, progress, ct, "Téléchargement de " + name);
         }
 
         public static string FetchChecksum(ReleaseInfo r, CancellationToken ct)

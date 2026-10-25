@@ -78,6 +78,13 @@ jobs:
           name: ixin-os-setup
           path: /mnt/ixin/out
 
+      - name: Récupérer le moteur de la machine virtuelle IXIN
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release
+        uses: actions/download-artifact@v4
+        with:
+          name: ixin-vm-engine
+          path: /mnt/ixin/out
+
       - name: Publier la Release
         if: startsWith(github.ref, 'refs/tags/') || inputs.release
         env:
@@ -118,7 +125,7 @@ jobs:
           immédiatement, point de restauration avant chaque mise à jour.
           NOTES
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "IXIN OS $TAG" --notes-file "$RUNNER_TEMP/notes.md" \
-            "$ISO".part* "$ISO.sha256" IXIN-OS-Setup.exe
+            "$ISO".part* "$ISO.sha256" IXIN-OS-Setup.exe ixin-vm-engine-win64.zip ixin-vm-engine-win64.zip.sha256
 
   site:
     # Flux du site os.ixin.online (nouvelle version, tailles, SHA-256) publié aussitôt la version créée

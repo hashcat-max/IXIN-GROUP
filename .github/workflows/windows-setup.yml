@@ -39,9 +39,30 @@ jobs:
           name: windows-boot
           path: build/windows-boot/
 
+  vm-engine:
+    name: Moteur de la machine virtuelle IXIN (QEMU pour Windows)
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: zip
+      - name: Assembler le moteur (QEMU de MSYS2, réduit au nécessaire)
+        run: tools/build-vm-engine.sh "$(cygpath -u "$RUNNER_TEMP")/vm-engine"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ixin-vm-engine
+          path: ${{ runner.temp }}/vm-engine/
+
   setup:
     name: IXIN-OS-Setup.exe (compilation + auto-test sur ${{ matrix.os }})
-    needs: boot
+    needs: [boot, vm-engine]
     # Deux générations de Windows : Server 2022 (noyau de Windows 10 21H2) et Server 2025 (Windows 11 24H2)
     strategy:
       fail-fast: false
@@ -55,6 +76,10 @@ jobs:
         with:
           name: windows-boot
           path: build/windows-boot
+      - uses: actions/download-artifact@v4
+        with:
+          name: ixin-vm-engine
+          path: ${{ runner.temp }}/vm-engine
       - name: Compiler
         run: dotnet build windows/IxinSetup/IxinSetup.csproj -c Release -nologo
       - name: Auto-test sur disque virtuel (préparation + annulation)
@@ -71,6 +96,12 @@ jobs:
           $exe = Resolve-Path "windows/IxinSetup/bin/Release/net462/IXIN-OS-Setup.exe"
           $p = Start-Process -FilePath $exe -ArgumentList "--self-test-boot-entry" -Wait -PassThru -NoNewWindow
           if ($p.ExitCode -ne 0) { throw "Test de l'entrée de démarrage échoué (code $($p.ExitCode))" }
+      - name: Machine virtuelle IXIN (moteur, disque virtuel, raccourci, démarrage du PC virtuel)
+        shell: powershell
+        run: |
+          $exe = Resolve-Path "windows/IxinSetup/bin/Release/net462/IXIN-OS-Setup.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--self-test-vm", "$env:RUNNER_TEMP\vm-engine\ixin-vm-engine-win64.zip" -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "Test de la machine virtuelle échoué (code $($p.ExitCode))" }
       - name: Informations sur la machine de test
         if: always()
         shell: powershell

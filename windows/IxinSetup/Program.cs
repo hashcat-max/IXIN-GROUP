@@ -22,6 +22,8 @@ namespace IxinSetup
                         return 0;
                     case "--self-test":
                         return SelfTest.Run(args.Length > 1 ? args[1] : null);
+                    case "--self-test-vm":
+                        return SelfTest.RunVm(args.Length > 1 ? args[1] : null);
                     case "--self-test-boot-entry":
                         return SelfTest.RunBootEntry();
                     case "--facts":
