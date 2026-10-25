@@ -3,8 +3,18 @@
 # construction de l'ISO, où ces deux fichiers sont l'installeur du système live.
 _legacy=(usr/local/bin/ixin-center usr/local/bin/ixin-secure usr/local/bin/ixin-gaming usr/local/bin/ixin-update)
 
+# « Jouer sous Windows » : note tout de suite si le menu de démarrage actuel contient Windows
+# (ensuite, /etc/grub.d/99_ixin_windows_note la tient à jour à chaque grub-mkconfig)
+_windows_note() {
+  [ -r boot/grub/grub.cfg ] || return 0
+  if grep -q -- "--class windows" boot/grub/grub.cfg; then
+    mkdir -p var/lib/ixin && echo "windows=1" > var/lib/ixin/windows && chmod 644 var/lib/ixin/windows
+  fi
+}
+
 post_install() {
   local f
+  _windows_note
   for f in "${_legacy[@]}"; do
     if [ -e "$f" ] && ! usr/bin/pacman -Qqo "/$f" >/dev/null 2>&1; then
       rm -f "$f"

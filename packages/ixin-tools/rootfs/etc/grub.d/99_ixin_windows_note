@@ -1,0 +1,15 @@
+#!/bin/sh
+# IXIN OS — note pour « Jouer sous Windows » (ixin-windows) : le menu de démarrage contient-il Windows ?
+#
+# Dernier script de grub-mkconfig : il relit le menu en cours d'écriture (sa propre sortie) et note
+# le résultat dans /var/lib/ixin/windows, lisible sans droits (le menu, lui, ne l'est pas). Couvre
+# l'entrée « Windows » d'IXIN (UEFI) comme celle d'os-prober (PC en mode BIOS). N'écrit rien dans le menu.
+out="$(readlink -f /proc/$$/fd/1 2>/dev/null)"
+[ -f "$out" ] || exit 0
+mkdir -p /var/lib/ixin 2>/dev/null || exit 0
+if grep -q -- "--class windows" "$out"; then
+    echo "windows=1" > /var/lib/ixin/windows && chmod 644 /var/lib/ixin/windows
+else
+    rm -f /var/lib/ixin/windows
+fi
+exit 0

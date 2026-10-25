@@ -10,11 +10,8 @@
 #   ixin-windows --yes [nom]       sans confirmation
 set -u
 
-if [ ! -s /var/lib/ixin/windows ] && ! grep -qsE -- "--class windows" /boot/grub/grub.cfg 2>/dev/null; then
-    present=0
-else
-    present=1
-fi
+# Noté par /etc/grub.d/99_ixin_windows_note à chaque mise à jour du menu de démarrage
+if [ -s /var/lib/ixin/windows ]; then present=1; else present=0; fi
 [ "${1:-}" = --check ] && { [ "$present" = 1 ]; exit $?; }
 
 ask=1

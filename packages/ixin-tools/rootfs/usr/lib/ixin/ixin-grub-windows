@@ -45,13 +45,6 @@ fi
 uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null)"
 [ -n "$uuid" ] || exit 0
 
-# Windows trouvé : noté pour « Jouer sous Windows » (ixin-windows), lisible sans droits
-if [ "${1:-}" = --menu ] && [ -d /var/lib ]; then
-    mkdir -p /var/lib/ixin 2>/dev/null &&
-        printf 'uuid=%s\n' "$uuid" > /var/lib/ixin/windows 2>/dev/null &&
-        chmod 644 /var/lib/ixin/windows 2>/dev/null
-fi
-
 case "${1:-}" in
 --uuid)
     echo "$uuid"
