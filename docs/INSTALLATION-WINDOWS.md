@@ -265,3 +265,37 @@ Le guide complet, pas à pas et pour débutants, est ici :
 
 Sur un PC en mode BIOS, l'installation à côté de Windows depuis une clé USB est encore peu testée :
 sauvegardez vos fichiers importants avant de commencer.
+
+---
+
+## 11. Dans une fenêtre (machine virtuelle)
+
+Pour **essayer** IXIN OS sans rien changer au PC : au lancement, IXIN OS Setup propose
+**« Dans une fenêtre de Windows (machine virtuelle) »**. IXIN OS s'ouvre alors comme une application,
+depuis une icône **« IXIN OS »** du bureau. Rien n'est modifié sur le disque de Windows ni au démarrage du PC,
+et il n'y a pas de Secure Boot à désactiver.
+
+| | |
+|---|---|
+| Ce qu'il faut | Windows 10 ou 11 64 bits, **8 Go de mémoire** conseillés (4 Go minimum), environ **45 Go** libres |
+| Accélération | la « **Plateforme de l'hyperviseur Windows** » (composant de Windows) : IXIN OS Setup l'active lui-même, le PC redémarre une fois, puis IXIN OS Setup se rouvre et continue |
+| Virtualisation | « Intel VT-x » ou « AMD-V / SVM » doit être activé dans les paramètres UEFI du PC (c'est le cas sur la plupart des PC récents) ; sinon IXIN OS fonctionne, mais très lentement |
+| Ce qui est installé | un seul dossier, `%LOCALAPPDATA%\IXIN OS (machine virtuelle)` : le moteur de la machine virtuelle IXIN (QEMU, logiciel libre), IXIN OS, le disque virtuel (fichier qui grossit à l'usage, 120 Go au plus) — et les icônes « IXIN OS » du bureau et du menu Démarrer |
+
+**Étapes**
+1. Lancez IXIN OS Setup → **« Dans une fenêtre de Windows »** → **« Préparer IXIN OS »** (ou d'abord
+   « Activer l'accélération et redémarrer »).
+2. IXIN OS Setup télécharge IXIN OS et le moteur (environ 5 Go, empreintes vérifiées), crée le disque virtuel et l'icône.
+3. **« Lancer IXIN OS »** : la première fois, installez IXIN OS dans la fenêtre — « Installer IXIN OS sur ce PC »,
+   puis **« Effacer le disque »** à l'étape « Partitions » (c'est le **disque virtuel** : vos fichiers Windows ne sont
+   pas touchés), votre nom et votre mot de passe, « Installer ». À la fin, redémarrez : IXIN OS démarre désormais
+   directement.
+4. Ensuite : double-cliquez sur l'icône **« IXIN OS »**. **Ctrl + Alt + F** : plein écran ; **Ctrl + Alt + G** :
+   libérer la souris. Pour fermer, éteignez IXIN OS (menu IXIN → Éteindre).
+
+**Supprimer** : relancez IXIN OS Setup → **« Supprimer la machine virtuelle »** (tout ce qui a été créé dans IXIN OS
+est effacé).
+
+**Limites** : plus lent qu'IXIN OS installé à côté de Windows (la mémoire et le processeur sont partagés avec
+Windows), pas d'accélération 3D : pas de jeux exigeants. Pour en profiter pleinement, installez-le ensuite
+« à côté de Windows » (section 2).
