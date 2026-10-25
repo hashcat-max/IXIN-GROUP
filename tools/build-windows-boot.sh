@@ -35,7 +35,7 @@ else
 fi
 
 grub-mkstandalone -O x86_64-efi --compress=xz "${SBAT[@]}" \
-    --modules="part_gpt part_msdos fat exfat ntfs iso9660 loopback linux chain search search_label search_fs_file test echo sleep all_video gfxterm font normal configfile efi_gop" \
+    --modules="part_gpt part_msdos fat exfat ntfs iso9660 loopback linux chain search search_label search_fs_file test echo sleep all_video gfxterm font normal configfile efi_gop efifwsetup" \
     --locales="" --themes="" --fonts="unicode" \
     -o "$OUT/grubx64.efi" \
     "boot/grub/grub.cfg=$ROOT/windows/boot/setup-grub.cfg"

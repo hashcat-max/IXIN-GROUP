@@ -33,7 +33,7 @@ if ! pacman -Si shim-signed >/dev/null 2>&1; then
   grep -q '^\[chaotic-aur\]' /etc/pacman.conf || printf '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist\n' >> /etc/pacman.conf
   pacman -Sy >/dev/null
 fi
-pacman -S --needed --noconfirm grub sbsigntools shim-signed >/dev/null
+pacman -S --needed --noconfirm grub sbsigntools shim-signed ttf-dejavu >/dev/null
 SHIM=/usr/share/shim-signed
 cp "$SHIM/shimx64.efi" "$SHIM/mmx64.efi" "$SHIM/fbx64.efi" "$OUT/"
 openssl x509 -in "$CRT" -outform DER -out "$OUT/ixin-secureboot.cer"
@@ -55,7 +55,21 @@ EOF
 MODULES="normal configfile echo test true sleep reboot halt minicmd loadenv regexp probe
   part_gpt part_msdos fat exfat ext2 btrfs ntfs iso9660 loopback gzio zstd xzio lzopio
   search search_fs_uuid search_fs_file search_label linux chain efifwsetup efibootnext bli tpm
-  all_video efi_gop gfxterm gfxterm_background gfxmenu png jpeg font"
+  all_video efi_gop gfxterm gfxterm_background gfxmenu png jpeg font memdisk tar"
+
+# Polices intégrées : sous Secure Boot, GRUB refuse les polices lues sur le disque (« prohibited by
+# secure boot policy ») ; sans elles, pas de menu graphique ni de thème IXIN. Elles sont donc
+# embarquées dans l'image signée (memdisk) : unicode + celles du thème (mêmes que ixin-artwork).
+FONTS="DejaVuSans:14 DejaVuSans:16 DejaVuSans:18 DejaVuSans-Bold:18 DejaVuSansMono:14"
+mkdir -p "$WORK/memdisk/fonts"
+cp /usr/share/grub/unicode.pf2 "$WORK/memdisk/fonts/"
+loadfonts="loadfont (memdisk)/fonts/unicode.pf2"
+for f in $FONTS; do
+  grub-mkfont -s "${f#*:}" -o "$WORK/memdisk/fonts/${f%%:*}-${f#*:}.pf2" "/usr/share/fonts/TTF/${f%%:*}.ttf"
+  loadfonts="$loadfonts
+loadfont (memdisk)/fonts/${f%%:*}-${f#*:}.pf2"
+done
+tar -cf "$WORK/memdisk.tar" -C "$WORK/memdisk" fonts
 
 # Configuration intégrée : retrouve la partition /boot d'IXIN OS (fichier repère posé par
 # ixin-secureboot), puis lit le menu habituel /boot/grub/grub.cfg. GRUB l'exécute ligne par ligne
@@ -63,7 +77,7 @@ MODULES="normal configfile echo test true sleep reboot halt minicmd loadenv rege
 # suite, configfile ne rend la main que si le menu est introuvable à cet endroit.
 # « set root= » évite de lire par erreur un grub.cfg d'un autre système sur la partition EFI.
 #   /boot séparé (installation automatique) ; /boot dans la racine ; racine btrfs, sous-volume @
-cat > "$WORK/early.cfg" <<'EOF'
+{ echo "$loadfonts"; cat <<'EOF'
 set root=
 search --no-floppy --file --set=root /grub/ixin-boot
 set prefix=($root)/grub
@@ -77,7 +91,9 @@ search --no-floppy --file --set=root /@/boot/grub/ixin-boot
 set prefix=($root)/@/boot/grub
 configfile $prefix/grub.cfg
 EOF
-grub-mkimage -O x86_64-efi -o "$WORK/grubx64.efi" -p /grub --sbat "$OUT/sbat.csv" -c "$WORK/early.cfg" $MODULES
+} > "$WORK/early.cfg"
+grub-mkimage -O x86_64-efi -o "$WORK/grubx64.efi" -p /grub --sbat "$OUT/sbat.csv" -c "$WORK/early.cfg" \
+  -m "$WORK/memdisk.tar" $MODULES
 sbsign --key "$KEY" --cert "$CRT" --output "$OUT/grubx64.efi" "$WORK/grubx64.efi" >/dev/null
 sbverify --cert "$CRT" "$OUT/grubx64.efi" >/dev/null
 echo "Fichiers Secure Boot prêts dans $OUT (GRUB $grub_ver, SBAT grub,$grub_gen)"
