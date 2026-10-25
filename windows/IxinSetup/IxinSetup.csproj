@@ -43,6 +43,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="$(GrubEfi)" LogicalName="grubx64.efi" />
+    <!-- Secure Boot (construction avec la clé IXIN) : shim, MokManager et certificat, à côté du chargeur -->
+    <EmbeddedResource Include="$([System.IO.Path]::GetDirectoryName($(GrubEfi)))\shimx64.efi" LogicalName="shimx64.efi" Condition="Exists('$([System.IO.Path]::GetDirectoryName($(GrubEfi)))\shimx64.efi')" />
+    <EmbeddedResource Include="$([System.IO.Path]::GetDirectoryName($(GrubEfi)))\mmx64.efi" LogicalName="mmx64.efi" Condition="Exists('$([System.IO.Path]::GetDirectoryName($(GrubEfi)))\mmx64.efi')" />
+    <EmbeddedResource Include="$([System.IO.Path]::GetDirectoryName($(GrubEfi)))\ixin-secureboot.cer" LogicalName="ixin-secureboot.cer" Condition="Exists('$([System.IO.Path]::GetDirectoryName($(GrubEfi)))\ixin-secureboot.cer')" />
     <EmbeddedResource Include="Assets\ixin-logo-64.png" LogicalName="ixin-logo-64.png" />
     <EmbeddedResource Include="Assets\ixin.ico" LogicalName="ixin.ico" />
   </ItemGroup>

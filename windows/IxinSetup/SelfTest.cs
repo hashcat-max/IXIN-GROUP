@@ -409,6 +409,16 @@ namespace IxinSetup
                    "lecture du fichier .sha256");
             Expect(Plan.SetupSizeFor(5079388160) == 6 * Plan.GiB, "taille de la partition d'installation");
 
+            // Clé Secure Boot IXIN : variables MokNew / MokAuth identiques à celles de mokutil (référence Python)
+            var fakeCert = Enumerable.Range(1, 40).Select(i => (byte)i).ToArray();
+            var mokNew = Mok.SignatureList(fakeCert);
+            string Hex(byte[] b) => string.Concat(b.Select(x => x.ToString("x2")));
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                Expect(mokNew.Length == 84 && Hex(sha.ComputeHash(mokNew)) == "7fd4ebf99430d9a5c56997dfc6dfc1a2a28b294b3ca667f4c57b69258c4b398f",
+                       "liste de signatures UEFI (MokNew)");
+            Expect(Hex(Mok.Auth(mokNew, Mok.Password)) == "2818f68c8b6e6f4b7c864e912a76e85daed55421e49221edd4e45b12c3b51436",
+                   "empreinte du mot de passe MokManager (MokAuth)");
+
             // Compatibilité : le programme démarre partout et explique les PC qui ne conviennent pas
             Expect(Compat.Check("AMD64", true, 19045) == null, "Windows 10 64 bits pris en charge");
             Expect(Compat.Check("AMD64", true, 26100) == null, "Windows 11 64 bits pris en charge");

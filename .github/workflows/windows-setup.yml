@@ -29,11 +29,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Construire grubx64.efi (conteneur Arch Linux)
+      - name: Construire grubx64.efi (conteneur Arch Linux ; signé pour Secure Boot si la clé est configurée)
+        env:
+          IXIN_SECUREBOOT_KEY: ${{ secrets.IXIN_SECUREBOOT_KEY }}
         run: |
-          docker run --rm -v "$GITHUB_WORKSPACE":/src archlinux:latest bash -c '
+          docker run --rm -v "$GITHUB_WORKSPACE":/src -e IXIN_SECUREBOOT_KEY archlinux:latest bash -c '
             set -e
-            pacman -Sy --noconfirm --needed grub >/dev/null
+            pacman-key --init >/dev/null && pacman-key --populate archlinux >/dev/null
+            pacman -Sy --noconfirm --needed grub sbsigntools openssl >/dev/null
             /src/tools/build-windows-boot.sh /src/build/windows-boot'
           sudo chown -R "$USER" build
       - uses: actions/upload-artifact@v4

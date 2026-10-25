@@ -19,6 +19,7 @@ namespace IxinSetup
         public const string Description = "IXIN OS Setup";
         public const string EspDirectory = @"EFI\IXIN-SETUP";
         public const string LoaderPath = @"\EFI\IXIN-SETUP\grubx64.efi";
+        public const string ShimPath = @"\EFI\IXIN-SETUP\shimx64.efi";   // Secure Boot : shim devant le chargeur
         public const string OptionsFile = "options.cfg";   // options de l'installation, lues par le menu de démarrage
         public const string IxinLoaderPath = @"\EFI\IXIN\grubx64.efi";   // IXIN OS installé (son menu GRUB)
         public const string IxinShimPath = @"\EFI\IXIN\shimx64.efi";     // IXIN OS installé, compatible Secure Boot
@@ -108,6 +109,28 @@ namespace IxinSetup
                    "set ixin_options=\"" + string.Join(" ", options) + "\"\n";
         }
 
+        private static byte[] Resource(string name)
+        {
+            using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream(name))
+            {
+                if (s == null) return null;
+                using (var ms = new MemoryStream())
+                {
+                    s.CopyTo(ms);
+                    return ms.ToArray();
+                }
+            }
+        }
+
+        /// <summary>Version construite avec la clé Secure Boot d'IXIN : shim et certificat inclus.</summary>
+        public static bool SecureBootCapable => Resource("shimx64.efi") != null && Resource("ixin-secureboot.cer") != null;
+
+        /// <summary>Certificat Secure Boot d'IXIN (DER), ou null.</summary>
+        public static byte[] SecureBootCertificate => Resource("ixin-secureboot.cer");
+
+        /// <summary>Chemin démarré par l'entrée « IXIN OS Setup » : shim si Secure Boot est pris en charge.</summary>
+        public static string EntryPath => SecureBootCapable ? ShimPath : LoaderPath;
+
         public static void InstallLoader(string espLetter, string options = null)
         {
             string dir = espLetter + @":\" + EspDirectory;
@@ -117,6 +140,11 @@ namespace IxinSetup
                 throw new SetupException($"La partition EFI est pleine ({Facts.Gb(drive.AvailableFreeSpace)} libres).");
             Directory.CreateDirectory(dir);
             File.WriteAllBytes(Path.Combine(dir, "grubx64.efi"), loader);
+            foreach (var name in new[] { "shimx64.efi", "mmx64.efi", "ixin-secureboot.cer" })
+            {
+                var data = Resource(name);
+                if (data != null) File.WriteAllBytes(Path.Combine(dir, name), data);
+            }
             File.WriteAllText(Path.Combine(dir, "LISEZMOI.txt"),
                 "Menu de démarrage de l'installation d'IXIN OS, ajouté par IXIN OS Setup.\r\n" +
                 "Il est supprimé automatiquement après l'installation, ou par « Annuler la préparation »\r\n" +
@@ -148,8 +176,9 @@ namespace IxinSetup
         /// partition EFI de Windows, ou celle montée sur <paramref name="deviceLetter"/> si indiquée
         /// (partition EFI dédiée, ou partition choisie dans les options avancées).
         /// </summary>
-        public static string Create(string description = Description, string path = LoaderPath, string deviceLetter = null)
+        public static string Create(string description = Description, string path = null, string deviceLetter = null)
         {
+            path = path ?? EntryPath;
             foreach (var old in ParseEntries(Run("bcdedit.exe", "/enum firmware /v", check: false), path)) Delete(old);
             string output = Run("bcdedit.exe", $"/copy {{bootmgr}} /d \"{description}\"");
             var m = Guid.Match(output);
@@ -175,7 +204,7 @@ namespace IxinSetup
         public static List<string> Find()
         {
             string output = Run("bcdedit.exe", "/enum firmware /v", check: false);
-            return ParseEntries(output);
+            return ParseEntries(output, ShimPath).Concat(ParseEntries(output, LoaderPath)).Distinct().ToList();
         }
 
         /// <summary>Entrées du firmware qui démarrent IXIN OS installé.</summary>

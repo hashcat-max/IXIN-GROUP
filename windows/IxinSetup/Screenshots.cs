@@ -55,6 +55,7 @@ namespace IxinSetup
                 new Shot("retour-windows-secure-boot", "retour-windows", Pc(), returned, null),
                 new Shot("pc-incompatible", "incompatible", Pc(), null, null),
                 new Shot("0-choix", "choix", Pc(), null, null),
+                new Shot("7b-secure-boot-mok", "terminee-mok", Pc(), null, null),
                 new Shot("vm-verification", "vm-verification", Pc(), null, null),
                 new Shot("vm-prete", "vm-prete", Pc(), null, null),
             };

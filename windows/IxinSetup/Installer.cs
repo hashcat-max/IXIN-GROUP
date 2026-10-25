@@ -182,7 +182,11 @@ namespace IxinSetup
                 }
             }
 
-            if (f.SecureBoot == true)
+            if (f.SecureBoot == true && BootEntry.SecureBootCapable)
+                list.Add(new Check(CheckLevel.Ok, "Secure Boot activé : il le reste",
+                    "IXIN OS est compatible Secure Boot. Au premier démarrage, un écran bleu demandera une seule fois d'autoriser " +
+                    "IXIN OS (IXIN OS Setup vous guide). Windows, ses jeux avec anti-triche et BitLocker n'y voient aucune différence."));
+            else if (f.SecureBoot == true)
                 list.Add(new Check(CheckLevel.Warning, "Secure Boot est activé",
                     "IXIN OS ne démarre pas encore avec Secure Boot : il faudra le désactiver dans les paramètres UEFI " +
                     "(IXIN OS Setup y redémarre pour vous). Attention : certains jeux Windows avec anti-triche " +
@@ -418,6 +422,7 @@ namespace IxinSetup
             {
                 step?.Report("Retrait de « IXIN OS Setup » du menu de démarrage…");
                 foreach (var id in BootEntry.Find()) BootEntry.Delete(id);
+                if (BootEntry.SecureBootCapable) Mok.CancelRequest();   // demande de clé IXIN encore en attente
             }
 
             if (st != null && st.EspCreated)

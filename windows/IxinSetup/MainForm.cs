@@ -102,6 +102,38 @@ namespace IxinSetup
             };
         }
 
+        /// <summary>Secure Boot activé et version d'IXIN OS Setup signée : il reste activé (clé IXIN via MokManager).</summary>
+        private bool MokFlow => facts?.SecureBoot == true && (DemoSecureBootCapable ?? BootEntry.SecureBootCapable);
+        internal bool? DemoSecureBootCapable;   // captures d'écran
+
+        private bool KeyEnrolled() => DemoSecureBootCapable.HasValue ? false : Mok.IsEnrolled(BootEntry.SecureBootCertificate);
+
+        /// <summary>Demande l'enregistrement de la clé IXIN (si besoin) puis redémarre sur l'installation.</summary>
+        private void RestartWithMok()
+        {
+            try
+            {
+                if (!KeyEnrolled()) Mok.RequestEnrollment(BootEntry.SecureBootCertificate);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.ToString());
+                ShowError(ex.Message);
+                return;
+            }
+            Restart(false);
+        }
+
+        private Control MokSteps()
+        {
+            return Theme.Label("1.  Cliquez sur « Redémarrer et autoriser IXIN OS ».\n" +
+                               "2.  Un écran bleu « Shim UEFI key management » s'affiche : appuyez sur une touche, puis choisissez " +
+                               "« Enroll MOK » → « Continue » → « Yes ».\n" +
+                               $"3.  Tapez le mot de passe {Mok.Password} (il ne s'affiche pas), Entrée, puis « Reboot ».\n" +
+                               "4.  Le PC revient sur Windows : IXIN OS Setup se rouvre tout seul, cliquez sur « Redémarrer et installer IXIN OS ».",
+                               null, Theme.Text);
+        }
+
         private void FitToScreen()
         {
             var area = Screen.FromControl(this).WorkingArea;
@@ -635,7 +667,8 @@ namespace IxinSetup
             else
                 Item("Les réglages de Windows ne sont pas modifiés (options avancées).");
             if (facts.BitLocker.ProtectionOn) Item("BitLocker sera suspendu pendant 3 démarrages, puis se réactivera tout seul.");
-            if (facts.SecureBoot == true) Item("Secure Boot devra ensuite être désactivé dans les paramètres UEFI (expliqué à l'étape suivante).");
+            if (MokFlow) Item("Secure Boot reste activé : au redémarrage, un écran bleu demandera une fois d'autoriser IXIN OS (expliqué à l'étape suivante).");
+            else if (facts.SecureBoot == true) Item("Secure Boot devra ensuite être désactivé dans les paramètres UEFI (expliqué à l'étape suivante).");
             col.Controls.Add(Theme.Label("Tout peut être annulé : « Annuler la préparation » dans IXIN OS Setup rend l'espace à Windows.", Theme.Small, Theme.Muted));
             var backup = new CheckBox { Text = "J'ai sauvegardé mes fichiers importants (précaution recommandée)", AutoSize = true, ForeColor = Theme.Text, Margin = new Padding(0, 14, 0, 0) };
             col.Controls.Add(backup);
@@ -774,7 +807,18 @@ namespace IxinSetup
         private void ShowDone()
         {
             var col = Theme.Column();
-            if (facts.SecureBoot == true)
+            if (MokFlow)
+            {
+                col.Controls.Add(Theme.Label("Dernière étape : autoriser IXIN OS", Theme.Title, Theme.Accent));
+                col.Controls.Add(Theme.Label("Tout est prêt sur le disque. Secure Boot reste activé (Windows, ses jeux et BitLocker n'y voient " +
+                                             "aucune différence) : il suffit d'autoriser une fois la clé d'IXIN OS."));
+                col.Controls.Add(MokSteps());
+                col.Controls.Add(Theme.Label("Dans l'installation, à l'étape « Partitions », la zone « Espace libre » est déjà choisie.", Theme.Small, Theme.Muted));
+                ShowPage(col,
+                    Action("Redémarrer et autoriser IXIN OS", RestartWithMok, primary: true),
+                    Action("Plus tard", Close));
+            }
+            else if (facts.SecureBoot == true)
             {
                 col.Controls.Add(Theme.Label("Dernière étape : désactiver Secure Boot", Theme.Title, Theme.Accent));
                 col.Controls.Add(Theme.Label("Tout est prêt sur le disque. IXIN OS ne démarre pas encore avec Secure Boot :"));
@@ -838,6 +882,30 @@ namespace IxinSetup
             string keyText = key != null
                 ? $"Pour ce PC ({maker}), la touche est en général : {key}."
                 : "Selon la marque : F12 (Acer, Dell, Lenovo…), F11 (MSI, ASRock), F9 (HP), F8 ou Échap (ASUS).";
+            if (MokFlow)
+            {
+                if (KeyEnrolled())
+                {
+                    col.Controls.Add(Theme.Label("La clé d'IXIN OS est enregistrée ✔", Theme.Subtitle, Theme.Accent));
+                    col.Controls.Add(Theme.Label("Secure Boot reconnaît maintenant IXIN OS. Redémarrez pour lancer l'installation."));
+                    ShowPage(col,
+                        Action("Redémarrer et installer IXIN OS", () => Restart(false), primary: true),
+                        Action("Annuler la préparation", async () => await RunUndo()),
+                        Action("Plus tard", Close));
+                    return;
+                }
+                col.Controls.Add(Theme.Label("La clé d'IXIN OS n'a pas encore été autorisée : sans elle, Secure Boot refuse de lancer " +
+                                             "l'installation et le PC revient sur Windows."));
+                col.Controls.Add(MokSteps());
+                col.Controls.Add(Theme.Label("L'écran bleu n'est pas apparu ? Le PC n'a peut-être pas démarré sur l'installation : appuyez sur la touche " +
+                                             "du menu de démarrage dès l'allumage et choisissez « IXIN OS Setup ». " + keyText, Theme.Small, Theme.Muted));
+                ShowPage(col,
+                    Action("Redémarrer et autoriser IXIN OS", RestartWithMok, primary: true),
+                    Action("Désactiver Secure Boot à la place", () => Restart(true)),
+                    Action("Annuler la préparation", async () => await RunUndo()),
+                    Action("Plus tard", Close));
+                return;
+            }
             if (facts.SecureBoot == true)
             {
                 col.Controls.Add(Theme.Label("L'installation d'IXIN OS n'a pas pu démarrer : Secure Boot est toujours activé. " +
@@ -1118,14 +1186,19 @@ namespace IxinSetup
             var col = Theme.Column();
             col.Controls.Add(Theme.Label("L'installation d'IXIN OS est prête", Theme.Title, Theme.Accent));
             col.Controls.Add(Theme.Label($"Préparée le {state.Created.Replace('T', ' ')} — {Facts.Gb(state.IxinSize)} libres pour IXIN OS."));
-            if (facts.SecureBoot == true)
+            if (MokFlow)
+                col.Controls.Add(Theme.Label("Secure Boot est activé : au redémarrage, autorisez une fois IXIN OS sur l'écran bleu (mot de passe " +
+                                             Mok.Password + ").", null, Theme.Muted));
+            else if (facts.SecureBoot == true)
                 col.Controls.Add(Theme.Label("Secure Boot est encore activé : désactivez-le dans les paramètres UEFI pour pouvoir démarrer l'installation.", null, Theme.Warning));
             col.Controls.Add(Theme.Label("Dans l'installation, à l'étape « Partitions », choisissez « Remplacer une partition » puis la zone « Espace libre ».", Theme.Small, Theme.Muted));
             col.Controls.Add(Theme.Label("« Annuler la préparation » supprime tout ce qu'IXIN OS Setup a ajouté et rend l'espace à Windows.", Theme.Small, Theme.Muted));
             ShowPage(col,
-                facts.SecureBoot == true
-                    ? Action("Redémarrer vers les paramètres UEFI", () => Restart(true), primary: true)
-                    : Action("Redémarrer et installer IXIN OS", () => Restart(false), primary: true),
+                MokFlow
+                    ? Action("Redémarrer et installer IXIN OS", RestartWithMok, primary: true)
+                    : facts.SecureBoot == true
+                        ? Action("Redémarrer vers les paramètres UEFI", () => Restart(true), primary: true)
+                        : Action("Redémarrer et installer IXIN OS", () => Restart(false), primary: true),
                 Action("Annuler la préparation", async () => await RunUndo()),
                 Action("Quitter", Close));
         }
@@ -1216,7 +1289,13 @@ namespace IxinSetup
                                  "21:30:03  Téléchargement d'IXIN OS (build-2026.10.15-3, 4,7 Go)…" + Environment.NewLine;
                     break;
                 case "terminee":
+                    DemoSecureBootCapable = null;
                     ShowDone();
+                    break;
+                case "terminee-mok":
+                    DemoSecureBootCapable = true;
+                    ShowDone();
+                    DemoSecureBootCapable = null;
                     break;
                 case "prete":
                     ShowPrepared();
