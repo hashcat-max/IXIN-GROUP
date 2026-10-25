@@ -58,15 +58,23 @@ MODULES="normal configfile echo test true sleep reboot halt minicmd loadenv rege
   all_video efi_gop gfxterm gfxterm_background gfxmenu png jpeg font"
 
 # Configuration intégrée : retrouve la partition /boot d'IXIN OS (fichier repère posé par
-# ixin-secureboot), puis lit le menu habituel /boot/grub/grub.cfg
+# ixin-secureboot), puis lit le menu habituel /boot/grub/grub.cfg. GRUB l'exécute ligne par ligne
+# avec son interpréteur minimal (pas de if/else) : chaque emplacement possible est essayé à la
+# suite, configfile ne rend la main que si le menu est introuvable à cet endroit.
+# « set root= » évite de lire par erreur un grub.cfg d'un autre système sur la partition EFI.
+#   /boot séparé (installation automatique) ; /boot dans la racine ; racine btrfs, sous-volume @
 cat > "$WORK/early.cfg" <<'EOF'
+set root=
 search --no-floppy --file --set=root /grub/ixin-boot
-if [ -n "$root" ]; then
-    set prefix=($root)/grub
-else
-    search --no-floppy --file --set=root /boot/grub/ixin-boot
-    set prefix=($root)/boot/grub
-fi
+set prefix=($root)/grub
+configfile $prefix/grub.cfg
+set root=
+search --no-floppy --file --set=root /boot/grub/ixin-boot
+set prefix=($root)/boot/grub
+configfile $prefix/grub.cfg
+set root=
+search --no-floppy --file --set=root /@/boot/grub/ixin-boot
+set prefix=($root)/@/boot/grub
 configfile $prefix/grub.cfg
 EOF
 grub-mkimage -O x86_64-efi -o "$WORK/grubx64.efi" -p /grub --sbat "$OUT/sbat.csv" -c "$WORK/early.cfg" $MODULES

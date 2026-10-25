@@ -49,13 +49,22 @@ install_chain() {
         cp "$dest/mmx64.efi" "$dest/grubx64.efi" "$esp/EFI/BOOT/"
     fi
 
-    # Entrée « IXIN OS » du firmware vers shim (les anciennes entrées vers le GRUB non signé sont retirées)
+    # Entrée « IXIN OS » du firmware vers shim, sur CETTE partition EFI. Retirées : les anciennes entrées
+    # vers le GRUB non signé, et celles vers une partition qui n'existe plus (disque réinstallé)
     disk_part="$(findmnt -no SOURCE --mountpoint "$esp")"
     disk="/dev/$(lsblk -no PKNAME "$disk_part" | head -n 1)"
     part="$(cat "/sys/class/block/$(basename "$disk_part")/partition" 2>/dev/null)"
-    if ! efibootmgr -v 2>/dev/null | tr 'A-Z\\' 'a-z/' | grep -q '/efi/ixin/shimx64.efi'; then
-        for n in $(efibootmgr -v 2>/dev/null | tr 'A-Z\\' 'a-z/' | sed -n 's|^boot\([0-9a-f]\{4\}\)\*\{0,1\} .*/efi/ixin/grubx64.efi.*|\1|p'); do
-            efibootmgr -q -b "$n" -B || true
+    partuuid="$(lsblk -dno PARTUUID "$disk_part" | tr 'A-Z' 'a-z')"
+    present="$(lsblk -rno PARTUUID | tr 'A-Z' 'a-z')"
+    entries="$(efibootmgr -v 2>/dev/null | tr 'A-Z\\' 'a-z/' | grep '^boot[0-9a-f]\{4\}' | grep '/efi/ixin/')"
+    if ! printf '%s\n' "$entries" | grep '/efi/ixin/shimx64.efi' | grep -q "${partuuid:-?}"; then
+        printf '%s\n' "$entries" | while read -r line; do
+            n="$(printf '%s' "$line" | cut -c5-8)"
+            uuid="$(printf '%s' "$line" | sed -n 's/.*hd([0-9]*,gpt,\([0-9a-f-]*\),.*/\1/p')"
+            case "$line" in *grubx64.efi*) efibootmgr -q -b "$n" -B || true; continue ;; esac
+            if [ -n "$uuid" ] && ! printf '%s\n' "$present" | grep -qx "$uuid"; then
+                efibootmgr -q -b "$n" -B || true
+            fi
         done
         efibootmgr -q -c -d "$disk" -p "$part" -L "IXIN OS" -l '\EFI\IXIN\shimx64.efi' || die "entrée du firmware impossible à créer"
     fi
