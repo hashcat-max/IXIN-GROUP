@@ -1,0 +1,18 @@
+--- a/lang/calamares_fr.ts
++++ b/lang/calamares_fr.ts
+@@ -511,13 +511,13 @@
+       <location filename="../src/libcalamaresui/ViewManager.cpp" line="348"/>
+       <source>&amp;Install Now</source>
+       <comment>@button</comment>
+-      <translation>&amp;Installer Maintenant</translation>
++      <translation>&amp;Installer maintenant</translation>
+     </message>
+     <message>
+       <location filename="../src/libcalamaresui/ViewManager.cpp" line="355"/>
+       <source>Go &amp;Back</source>
+       <comment>@button</comment>
+-      <translation>Continuer &amp;Retour</translation>
++      <translation>&amp;Revenir en arrière</translation>
+     </message>
+     <message>
+       <location filename="../src/libcalamaresui/ViewManager.cpp" line="402"/>
