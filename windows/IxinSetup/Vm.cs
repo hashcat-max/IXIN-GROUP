@@ -148,6 +148,8 @@ $r = Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -All 
         {
             var a = new StringBuilder();
             a.Append("-name \"IXIN OS\" -machine q35");
+            // Fichiers de QEMU (firmware des cartes virtuelles…) : dans le dossier du moteur
+            a.Append($" -L {Q(Path.Combine(EngineDir, "share"))}");
             // Hyperviseur de Windows si disponible, sinon émulation (lente)
             a.Append(" -accel whpx,kernel-irqchip=off -accel tcg");
             a.Append($" -m {MemoryMb(ram)} -smp {Processors(cores)}");
