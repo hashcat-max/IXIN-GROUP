@@ -10,11 +10,13 @@ on:
     paths:
       - "windows/**"
       - "tools/build-windows-boot.sh"
+      - "tools/build-vm-engine.sh"
       - ".github/workflows/windows-setup.yml"
   pull_request:
     paths:
       - "windows/**"
       - "tools/build-windows-boot.sh"
+      - "tools/build-vm-engine.sh"
   workflow_dispatch:
   workflow_call:
 
