@@ -15,6 +15,7 @@
 #                                   repo/secureboot/ixin-secureboot.crt
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
+export MSYS_NO_PATHCONV=1   # Git Bash (Windows) : ne pas transformer « /CN=… » en chemin Windows
 command -v openssl >/dev/null || { echo "openssl est nécessaire"; exit 1; }
 [[ -e ixin-secureboot-PRIVEE.key ]] && { echo "ixin-secureboot-PRIVEE.key existe déjà : rien n'est écrasé"; exit 1; }
 umask 077
@@ -22,7 +23,7 @@ umask 077
 # 20 ans : un certificat expiré n'empêche pas shim de vérifier une signature, mais on évite la question.
 # RSA 2048 : seule taille acceptée par tous les firmwares et par shim.
 openssl req -new -x509 -newkey rsa:2048 -sha256 -nodes -days 7300 \
-  -subj "/CN=IXIN OS Secure Boot (équipe IXIN)/O=IXIN Group/" \
+  -subj "/CN=IXIN OS Secure Boot/O=IXIN Group" \
   -addext "extendedKeyUsage=codeSigning" \
   -keyout ixin-secureboot-PRIVEE.key -out ixin-secureboot.crt 2>/dev/null
 chmod 644 ixin-secureboot.crt

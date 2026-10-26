@@ -2,3 +2,6 @@ build/
 out/
 windows/IxinSetup/bin/
 windows/IxinSetup/obj/
+
+# Clé privée Secure Boot (tools/create-secureboot-key.sh) : jamais dans le dépôt
+*-PRIVEE.key
