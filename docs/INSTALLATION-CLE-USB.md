@@ -131,10 +131,29 @@ sur la touche du menu de démarrage, **dès l'allumage**, jusqu'à voir une list
 Dans la liste, choisissez la clé USB avec les flèches du clavier, puis **Entrée**. Si la clé apparaît deux
 fois, prenez celle qui commence par **UEFI**.
 
+### Écran bleu « Verification failed » ou « Shim UEFI key management » au premier démarrage
+
+Les versions d'IXIN OS **compatibles Secure Boot** (c'est écrit dans les notes de la version) démarrent
+sans rien désactiver. La première fois seulement, le PC doit apprendre à reconnaître la signature
+d'IXIN OS (comme quand on ajoute un contact de confiance) :
+
+1. Message « **Verification failed: (0x1A) Security Violation** » : appuyez sur **Entrée** (**OK**).
+2. Écran bleu **Shim UEFI key management** : appuyez sur une touche **avant 10 secondes**.
+3. Choisissez **Enroll key from disk** → la clé USB (souvent **ARCHISO_EFI**) →
+   le fichier **ixin-secureboot.cer**.
+4. **Continue** → **Yes** → **Reboot**.
+
+<img src="screenshots/secure-boot-cle-usb-1-verification.png" alt="Verification failed : appuyez sur Entrée" width="260"> <img src="screenshots/secure-boot-cle-usb-2-fichier.png" alt="Choisir ixin-secureboot.cer" width="260"> <img src="screenshots/secure-boot-cle-usb-3-continuer.png" alt="Continue" width="260">
+
+C'est fait pour de bon : ce PC démarre maintenant IXIN OS avec Secure Boot activé, la clé USB comme le
+système installé. Si vous avez installé IXIN OS depuis Windows avec IXIN OS Setup, l'écran est un peu
+différent : **Enroll MOK** → **Continue** → **Yes** → mot de passe **`ixinos`** → **Reboot**
+(IXIN OS Setup vous l'indique aussi).
+
 ### Le PC refuse de démarrer sur la clé ? (« Secure Boot violation », retour sur Windows…)
 
-IXIN OS ne démarre pas encore quand **Secure Boot** est activé (c'est prévu dans une prochaine version).
-Il faut le désactiver une fois :
+Avec une version d'IXIN OS **qui n'est pas encore compatible Secure Boot**, ou si l'écran bleu
+ci-dessus n'apparaît pas, désactivez **Secure Boot** une fois :
 
 1. Entrez dans les **paramètres du PC** (« BIOS » / « UEFI ») : depuis Windows, **Démarrage avancé** →
    **Dépannage** → **Options avancées** → **Paramètres du microprogramme UEFI** → **Redémarrer** ; ou, à
@@ -224,7 +243,8 @@ Windows **Gestion des disques**), supprimez ses partitions et créez-en une nouv
 | Ce qui se passe | Que faire |
 |---|---|
 | Le PC démarre sur Windows au lieu de la clé | Méthode 1 de l'étape 4, ou la touche du menu de démarrage (appuyez **dès l'allumage**, plusieurs fois). Essayez un autre port USB (de préférence directement sur le PC, pas sur un hub). Sur certains PC, désactivez « **Fast Boot** » dans les paramètres. |
-| « Secure Boot violation », « Invalid signature » | Désactivez Secure Boot (étape 4). |
+| « Verification failed », écran bleu « Shim UEFI key management » | Normal au premier démarrage d'une version compatible Secure Boot : suivez l'étape 4 (« Enroll key from disk »). |
+| « Secure Boot violation », « Invalid signature » | Version pas encore compatible Secure Boot : désactivez Secure Boot (étape 4). |
 | La clé n'apparaît pas dans le menu de démarrage | Refaites la clé avec Rufus en **mode Image DD**, ou avec balenaEtcher. Vieux PC : schéma **MBR** dans Rufus, et activez « **CSM** » / « **Legacy** » dans les paramètres. |
 | Écran noir après le menu IXIN | Redémarrez et choisissez **Mode compatibilité graphique**. Les cartes NVIDIA anciennes (GeForce GTX 10xx et plus vieilles) reçoivent automatiquement le pilote libre adapté. |
 | Pas de Wi-Fi | Branchez un câble Ethernet ou partagez la connexion du téléphone en USB, puis installez les mises à jour. Certaines puces Broadcom anciennes ne sont pas reconnues. |
@@ -247,7 +267,7 @@ et le modèle du PC, et l'étape où cela bloque (une photo de l'écran aide bea
 | ✅ Machines virtuelles | VirtualBox, VMware, QEMU / KVM, Hyper-V (outils invités inclus) |
 | ✅ Imprimantes et scanners | La plupart sont reconnus automatiquement (USB ou réseau), pilotes HP et Gutenprint inclus |
 | ⚠️ Mac à processeur Intel, Chromebooks Intel / AMD (firmware MrChromebox) | Possibles, non testés |
-| ⚠️ Secure Boot | À désactiver pour l'instant |
+| ✅ / ⚠️ Secure Boot | Pris en charge par les versions marquées « compatible Secure Boot » (une confirmation au premier démarrage) ; sinon, à désactiver |
 | ❌ Mac Apple Silicon (M1 à M4), PC à processeur ARM (Snapdragon), tablettes et téléphones | Non pris en charge |
 
 IXIN OS est en **version bêta** : il a été testé sur machines virtuelles et machines de test, pas encore sur un

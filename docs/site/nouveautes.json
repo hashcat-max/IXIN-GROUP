@@ -1,5 +1,18 @@
 [
  {
+  "tag": "build-2026.10.25-6",
+  "date": "2026-10-25",
+  "title": "Prête pour les premiers tests publics",
+  "items": [
+   "IXIN OS Setup vérifie le PC avant tout (processeur, version de Windows, disque RAID ou USB, services Windows désactivés) et explique clairement ce qui bloque, avec la solution.",
+   "Nouveau : IXIN OS dans une fenêtre, sans toucher au disque. IXIN OS Setup prépare une machine virtuelle IXIN, automatique, sans rien d'autre à installer.",
+   "Bouton « Jouer sous Windows » : un clic redémarre directement sur Windows, pour les jeux dont l'anti-triche l'exige (Valorant…).",
+   "Si le PC revient sur Windows au lieu de l'installation, IXIN OS Setup se rouvre tout seul et explique quoi faire (touche du menu de démarrage selon la marque).",
+   "Matériel : cartes NVIDIA anciennes prises en charge automatiquement, imprimantes et scanners reconnus, capteurs des PC convertibles.",
+   "Nouveau guide pas à pas pour installer IXIN OS avec une clé USB, même sans rien y connaître."
+  ]
+ },
+ {
   "tag": "build-2026.10.17-5",
   "date": "2026-10-17",
   "title": "IXIN OS Setup fonctionne sur plus de PC",

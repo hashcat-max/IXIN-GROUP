@@ -96,8 +96,22 @@ Windows et cliquez sur **« Rendre … à Windows »** (ou *Gestion des disques 
 
 ## 3. Secure Boot
 
-IXIN OS ne démarre pas encore avec Secure Boot activé (prévu dans une prochaine version).
-IXIN OS Setup redémarre directement dans les **paramètres UEFI** du PC :
+**Versions compatibles Secure Boot** (indiqué dans les notes de la version et dans IXIN OS Setup) : rien à
+désactiver. IXIN OS Setup demande au PC d'autoriser IXIN OS, une seule fois :
+
+1. cliquez sur **Redémarrer et autoriser IXIN OS** ;
+2. un écran bleu « **Shim UEFI key management** » s'affiche : appuyez sur une touche **avant 10 secondes**,
+   puis **Enroll MOK** → **Continue** → **Yes** ;
+3. tapez le mot de passe **`ixinos`** (il ne s'affiche pas), **Entrée**, puis **Reboot** ;
+4. le PC revient sur Windows : IXIN OS Setup se rouvre tout seul, cliquez sur **Redémarrer et installer
+   IXIN OS**.
+
+<img src="screenshots/secure-boot-1-enroll-mok.png" alt="Enroll MOK" width="260"> <img src="screenshots/secure-boot-2-confirmer.png" alt="Enroll the key(s)? Yes" width="260"> <img src="screenshots/secure-boot-3-mot-de-passe.png" alt="Mot de passe ixinos" width="260">
+
+Secure Boot reste activé : les jeux Windows dont l'anti-triche l'exige (Valorant…) continuent de
+fonctionner sous Windows.
+
+**Versions pas encore compatibles** : IXIN OS Setup redémarre directement dans les **paramètres UEFI** du PC :
 
 1. cherchez **Secure Boot** (souvent dans l'onglet *Boot*, *Security* ou *Authentication*) ;
 2. réglez-le sur **Disabled** ;
@@ -114,7 +128,8 @@ Option grisée ? Certains PC demandent d'abord un **mot de passe administrateur 
 souhaitez. Sur d'autres, il faut choisir « **Other OS** » au lieu de « Windows UEFI mode ».
 
 ⚠️ **Jeux Windows** : certains jeux avec anti-triche (Valorant, Battlefield 6…) exigent Secure Boot
-**sous Windows**. Tant que Secure Boot est désactivé, ces jeux ne se lancent plus sous Windows.
+**sous Windows**. Si vous avez dû désactiver Secure Boot, ces jeux ne se lancent plus sous Windows : passez à
+une version compatible Secure Boot et réactivez-le.
 
 ---
 
@@ -238,7 +253,8 @@ Journal détaillé : `C:\ProgramData\IXIN\setup.log` ; état : `C:\ProgramData\I
   (section 10).
 - PC avec plusieurs disques : IXIN OS s'installe sur le disque de Windows (la partition EFI, elle, peut
   être sur un autre disque).
-- Secure Boot : à désactiver (section 3).
+- Secure Boot : pris en charge par les versions compatibles (une autorisation au premier démarrage), à
+  désactiver sinon (section 3).
 - Testé sur Windows (disque virtuel) et, côté IXIN OS, de bout en bout en machine virtuelle sur un PC
   Windows simulé (menu IXIN OS Setup, installation dans l'espace libre, nettoyage, menu IXIN / Windows) ;
   à valider sur une grande variété de PC réels (firmwares de marques différentes) : signalez tout

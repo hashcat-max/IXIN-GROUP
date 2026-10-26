@@ -4,8 +4,9 @@
 > **os.ixin.online** (presentation, downloads, documentation). Everything stated here exists and has been
 > tested, unless explicitly marked otherwise. **Please do not invent features that are not listed here.**
 >
-> **Last update: October 17, 2026 — current release `build-2026.10.17-5`** (new: §0 release `-5` — EFI partition
-> found on any disk or created automatically, advanced options —, §3 new screenshots, §5.1, §8 new downloads).
+> **Last update: October 26, 2026 — current release `build-2026.10.25-6`** (new: §0 release `-6` — Windows 7 → 11
+> support, IXIN OS in a window, "Jouer sous Windows", hardware —, §4, §7, §8 new downloads, §9; Secure Boot: ready,
+> not yet active in a published release, see §7).
 > Companion file (French, ready to adapt into a page): `docs/INSTALLATION-WINDOWS.md`, the complete
 > "Installer IXIN OS à côté de Windows" user guide.
 
@@ -13,7 +14,30 @@
 
 ## 0. What's new (for a "Nouveautés" section)
 
-### `build-2026.10.17-5` (October 17, 2026) — current release
+### `build-2026.10.25-6` (October 25, 2026) — current release, ready for the first public tests
+- **IXIN OS Setup opens on every Windows PC and checks it first** (installation itself: Windows 10 / 11 64-bit). It
+  says plainly what blocks and points to the USB stick guide when needed: ARM or 32-bit processor/Windows, Windows
+  7 / 8 / 8.1, disk in RAID /
+  Intel RST, Windows on a USB disk, "dynamic" disk, disabled Windows storage services (re-enabled automatically).
+  Small screens are handled (the window always fits).
+- **New: IXIN OS in a window** ("machine virtuelle IXIN"): from IXIN OS Setup, choose "Essayer IXIN OS dans une
+  fenêtre" — nothing is changed on the disk. IXIN OS Setup downloads a bundled engine (QEMU, 50 MB) and IXIN OS, enables
+  the Windows hypervisor platform if needed (one restart), creates the virtual machine (half the RAM, up to 8 GB;
+  120 GB virtual disk that grows as needed) and puts "IXIN OS" shortcuts on the desktop and Start menu. "Supprimer"
+  removes everything. Windows 10 / 11 64-bit only.
+- **"Jouer sous Windows" button** in IXIN OS (Jeux tab of the IXIN Center, and a "Valorant (sous Windows)" shortcut):
+  one click restarts **directly into Windows**, once, for games whose anti-cheat requires Windows (Valorant…). Next
+  restart goes back to the normal menu. Works on UEFI and BIOS PCs.
+- **If the PC comes back to Windows instead of the installation**, IXIN OS Setup **reopens on its own** at logon and
+  explains what to do (Secure Boot still on, or the boot-menu key for the PC brand: F12 for Lenovo/Dell, F9 for HP…).
+- **Hardware**: older NVIDIA cards (GeForce GTX 10xx and older) automatically get the open-source driver, so the
+  screen no longer stays black; **printers and scanners** recognized automatically (USB and network, HP and
+  Gutenprint drivers); screen rotation sensors of convertible PCs.
+- **New beginner's guide** "installer IXIN OS avec une clé USB" (`docs/INSTALLATION-CLE-USB.md`): what an ISO is,
+  making the USB stick with Rufus/Ventoy/balenaEtcher, the boot-menu key for each brand, troubleshooting table.
+- Installer: confirmation buttons correctly translated ("Revenir en arrière", "Installer maintenant").
+
+### `build-2026.10.17-5` (October 17, 2026)
 - **IXIN OS Setup works on more PCs**: it no longer refuses PCs whose EFI (boot) partition is on another disk (PCs
   installed with two disks plugged in — they used to get "Partition EFI introuvable"). It looks at every disk, and
   if no EFI partition is usable (none, almost full, on a USB disk) it **creates one automatically** (300 MB).
@@ -162,8 +186,10 @@ An in-house graphical application that opens on first login. 5 tabs:
 - AMD, Intel and NVIDIA drivers (open NVIDIA kernel modules), 32- and 64-bit Vulkan.
 - `ixin-gaming %command%` command for Steam launch options (GameMode + MangoHud).
 - **Honest limitation, to state on the site**: games whose anti-cheat blocks Linux
-  (e.g. Valorant, Fortnite, some Call of Duty titles, Rainbow Six Siege) **do not work**, on any Linux distribution.
-  For those, keep Windows in dual boot. You can check a game on protondb.com.
+  (e.g. Valorant, Fortnite, some Call of Duty titles, Rainbow Six Siege) **do not work**, on any Linux distribution,
+  and IXIN OS does **not** try to trick anti-cheat systems (that gets accounts banned). For those, keep Windows in
+  dual boot: the **"Jouer sous Windows"** button (IXIN Center → Jeux, or the "Valorant (sous Windows)" shortcut) restarts
+  straight into Windows in one click. You can check a game on protondb.com.
 
 ### Dual boot with Windows
 - The IXIN boot menu offers **IXIN OS**, **Windows** and **UEFI Firmware Settings** (screenshot `menu-demarrage-ixin-windows.png`).
@@ -324,21 +350,28 @@ EFI partition (512 MB, or the existing Windows one) + separate **1 GB `/boot`** 
 - ❌ **Android phones / ARM tablets**: not supported (that would require a separate ARM port per device).
   The IXIN app on Android is the ecosystem's answer for phones.
 - ❌ **Mac with Apple Silicon (M1–M4)**: not supported. Intel Macs: possible, but not tested.
-- ❌ **Secure Boot**: must be disabled (signing planned for a later version). Some Windows games with anti-cheat
-  (Valorant, Battlefield 6…) require Secure Boot **under Windows**: they will not start in Windows while it is off.
+- ⏳ **Secure Boot**: support is **built and tested** (Microsoft-signed shim → IXIN-signed boot loader → IXIN-signed
+  kernel; the PC is asked once to trust the IXIN key on a blue "MokManager" screen; IXIN OS Setup prepares this from
+  Windows with the one-time password `ixinos`). It becomes active in the **first release built after the IXIN team
+  configures its signing key**; that release's notes will say "compatible Secure Boot". Until then, in `-6` and
+  older, Secure Boot must be disabled. Some Windows games with anti-cheat (Valorant, Battlefield 6…) require Secure
+  Boot **under Windows**: this is why Secure Boot support matters to gamers. Do not announce it as available yet.
+- ✅ **Windows 10 / 11 (64-bit)** for IXIN OS Setup (install and "IXIN OS in a window"); on Windows 7 / 8 / 8.1 it opens
+  and points to the USB stick guide.
 
 ## 8. Downloads
 
-Current release: **`build-2026.10.17-5`** (October 17, 2026) — https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.17-5
+Current release: **`build-2026.10.25-6`** (October 25, 2026) — https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.25-6
 
 | File | Size | For |
 |---|---|---|
-| `IXIN-OS-Setup.exe` | 3.7 MB | Windows 10 / 11: install without a USB stick (downloads IXIN OS itself) |
-| `ixin-os-2026.10.17-x86_64.iso.part00` / `.part01` / `.part02` | 1.99 + 1.99 + 1.08 GB (**5.06 GB** in total) | USB stick, virtual machine |
-| `ixin-os-2026.10.17-x86_64.iso.sha256` | — | integrity check of the reassembled ISO |
+| `IXIN-OS-Setup.exe` | 4.2 MB | Windows 10 / 11: install without a USB stick, or try IXIN OS in a window |
+| `ixin-os-2026.10.25-x86_64.iso.part00` / `.part01` / `.part02` | 1.99 + 1.99 + 1.15 GB (**5.13 GB** in total) | USB stick, virtual machine |
+| `ixin-os-2026.10.25-x86_64.iso.sha256` | — | integrity check of the reassembled ISO |
+| `ixin-vm-engine-win64.zip` (+ `.sha256`) | 50.8 MB | engine of "IXIN OS in a window", downloaded by IXIN OS Setup itself (no need to list it on the site) |
 
-- ISO SHA-256: `c46aff61207e7ba226fbacf7c6b108fe4f09360d5adf4dad35b09bdb074e78e8`
-- `IXIN-OS-Setup.exe` SHA-256: `7dfcacc1773e1f71051a1a654599afce3b1e74a1b8961927beea7b73e3734c02`
+- ISO SHA-256: `d2bff2a52c183575628fb6418c525cb7a00a6260585b7b34778b730b5b954458`
+- `IXIN-OS-Setup.exe` SHA-256: `c8a7107ddcf16bf6ba30cc708b66b1356b98659008b2f16cd5a25c62b290ff0e`
 - These values change with every release: if the site shows them, read them from the API below (each asset has a
   `digest` field, e.g. `sha256:7dfc…4c02`) rather than hard-coding them.
 - **Stable links** (always the latest release, good for buttons):
@@ -356,7 +389,14 @@ Current release: **`build-2026.10.17-5`** (October 17, 2026) — https://github.
 
 ## 9. Project status (to stay honest on the site)
 
-- Version: **Beta (v0.1)**, rolling, dated builds. Latest: **`build-2026.10.17-5`** (§0). Older releases are obsolete.
+- Version: **Beta (v0.1)**, rolling, dated builds. Latest: **`build-2026.10.25-6`** (§0). Older releases are obsolete.
+- `-6` tests: IXIN OS Setup built and self-tested on Windows Server 2022 and 2025 (GitHub Actions) including the
+  virtual-machine engine (started headless, UEFI firmware reached); legacy BIOS PC in a VM: live boot, full encrypted
+  install, installed system boots; "Jouer sous Windows" in BIOS and UEFI; NVIDIA driver choice on 7 simulated cards.
+- Secure Boot (not yet active, §7) tested in a VM whose firmware trusts only Microsoft keys: USB stick → MokManager
+  "Enroll key from disk" → live system with Secure Boot on; key request written exactly as IXIN OS Setup does from
+  Windows → MokManager password `ixinos` accepted; installed layout (shim + IXIN GRUB on the disk) → IXIN graphical
+  menu → signed kernel; an unsigned kernel is refused.
 - Tested in a VM: ISO build, UEFI boot, live desktop + taskbar, IXIN Center, graphical installer, full encrypted install,
   reboot of the installed system (GRUB → IXIN unlock screen → login → desktop; firewall, AppArmor, LUKS2 and encrypted
   DNS checked on the installed system).
@@ -369,7 +409,7 @@ Current release: **`build-2026.10.17-5`** (October 17, 2026) — https://github.
   ISO stored on the disk → guided install into the free space (Windows partitions cannot be selected), encrypted → first
   start with automatic cleanup → "IXIN / Windows" menu, Windows started by the firmware, Windows files intact.
 - **Not tested on real hardware yet** (VM and Windows test machines only): label everything **"Bêta"** on the site.
-- Known limits: Secure Boot must be off; IXIN OS Setup is not code-signed (SmartScreen warning); BIOS / MBR PCs need a USB
+- Known limits: Secure Boot must be off until a release says "compatible Secure Boot"; IXIN OS Setup is not code-signed (SmartScreen warning); BIOS / MBR PCs need a USB
   stick; IXIN OS Setup installs on the Windows disk only; no automatic **uninstall** of IXIN OS yet; "Installer à côté"
   from a USB stick not yet tested with a real Windows.
 - EFI partition handling (`-5`) tested on a real Windows (GitHub Actions, virtual disks) for three PCs: EFI partition
@@ -380,7 +420,7 @@ Current release: **`build-2026.10.17-5`** (October 17, 2026) — https://github.
 - `build-2026.10.16-4` checked after publication: SHA-256 of the reassembled ISO, then the published ISO started in a
   VM on a simulated Windows PC in the "launched from Windows" mode: the "Partitions" step offers only "Remplacer une
   partition" and manual partitioning.
-- Ideas for later versions: Secure Boot signing, code signing for IXIN OS Setup, uninstall from Windows,
+- Ideas for later versions: code signing for IXIN OS Setup, "IXIN OS in a window" from Linux, uninstall from Windows,
   an optional "macOS-style" layout (dock), an optional security toolbox, translations.
 
 ## 10. Suggested structure for os.ixin.online
