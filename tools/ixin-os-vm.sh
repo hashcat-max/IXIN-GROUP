@@ -51,7 +51,8 @@ fail() {
 # ── 1. QEMU et le firmware UEFI ────────────────────────────────────────────────
 as_root() {
     if [[ $EUID -eq 0 ]]; then "$@"
-    elif [[ -t 0 ]] && command -v sudo >/dev/null; then sudo "$@"
+    elif command -v sudo >/dev/null && sudo -n true 2>/dev/null; then sudo "$@"
+    elif { [[ -t 0 ]] || [[ -t 1 ]]; } && command -v sudo >/dev/null; then sudo "$@"
     elif command -v pkexec >/dev/null; then pkexec "$@"
     else fail "Impossible d'obtenir les droits d'administrateur pour installer QEMU. Installez-le vous-même, puis relancez."; fi
 }
