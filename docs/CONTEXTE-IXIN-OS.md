@@ -14,6 +14,16 @@
 
 ## 0. What's new (for a "Nouveautés" section)
 
+### Since `-6` (available now, no new ISO needed)
+- **IXIN OS in a window, from Linux**: one command in a terminal (Ubuntu, Debian, Mint, Fedora, Arch, openSUSE…):
+  `curl -fsSLO https://hashcat-max.github.io/IXIN-GROUP/site/ixin-os-vm.sh && bash ixin-os-vm.sh`. It installs QEMU
+  with the distribution's package manager (password asked once), downloads IXIN OS and checks its SHA-256 (resumes
+  an interrupted download), creates the virtual machine (KVM acceleration, half the RAM up to 8 GB, 120 GB virtual
+  disk that grows as needed) and adds "IXIN OS" to the applications menu (and the desktop). `--supprimer` removes
+  everything, `--mettre-a-jour` fetches the latest ISO. Tested automatically on Ubuntu, Debian, Fedora, Arch Linux
+  and openSUSE (GitHub Actions). The site feed gives the command in `downloads.linux_vm`.
+- Secure Boot: boot-loader fixes found by the VM tests (see §7) — not yet active in a release.
+
 ### `build-2026.10.25-6` (October 25, 2026) — current release, ready for the first public tests
 - **IXIN OS Setup opens on every Windows PC and checks it first** (installation itself: Windows 10 / 11 64-bit). It
   says plainly what blocks and points to the USB stick guide when needed: ARM or 32-bit processor/Windows, Windows
@@ -345,7 +355,8 @@ EFI partition (512 MB, or the existing Windows one) + separate **1 GB `/boot`** 
 
 - ✅ **64-bit Intel and AMD PCs** (desktops, laptops), UEFI and BIOS (live). AMD / Intel / NVIDIA GPUs.
 - ✅ **Install from Windows** (IXIN OS Setup): Windows 10 / 11 64-bit, UEFI + GPT disk, BitLocker supported.
-- ✅ **Virtual machines**: VirtualBox, VMware, QEMU / KVM, Hyper-V (guest tools included).
+- ✅ **Virtual machines**: VirtualBox, VMware, QEMU / KVM, Hyper-V (guest tools included). Automatic "IXIN OS in a
+  window": IXIN OS Setup on Windows 10 / 11, `ixin-os-vm.sh` on Linux (§0).
 - ⚠️ **Chromebooks**: only x86 (Intel / AMD) models with alternative UEFI firmware (MrChromebox). Not tested.
 - ❌ **Android phones / ARM tablets**: not supported (that would require a separate ARM port per device).
   The IXIN app on Android is the ecosystem's answer for phones.

@@ -104,6 +104,14 @@ jobs:
           Si Windows affiche « Windows a protégé votre ordinateur » : **Informations complémentaires → Exécuter quand même**
           (le programme n'est pas encore signé ; son code source est dans le dossier windows/ du dépôt).
 
+          ### Essayer IXIN OS dans une fenêtre, depuis Linux
+          Une seule commande (Ubuntu, Debian, Mint, Fedora, Arch, openSUSE…) : QEMU est installé, IXIN OS
+          téléchargé et vérifié, la machine virtuelle créée et ajoutée au menu des applications.
+          \`\`\`
+          curl -fsSLO https://hashcat-max.github.io/IXIN-GROUP/site/ixin-os-vm.sh && bash ixin-os-vm.sh
+          \`\`\`
+          (ou téléchargez **ixin-os-vm.sh** ci-dessous). Sous Windows, IXIN OS Setup propose la même chose.
+
           ### Clé USB, machine virtuelle ou disque entier
           Le plus simple : téléchargez l'ISO en un seul fichier sur https://os.ixin.online/telecharger et suivez le
           guide pas à pas : https://github.com/${GITHUB_REPOSITORY}/blob/HEAD/docs/INSTALLATION-CLE-USB.md
@@ -126,7 +134,8 @@ jobs:
           immédiatement, point de restauration avant chaque mise à jour.
           NOTES
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "IXIN OS $TAG" --notes-file "$RUNNER_TEMP/notes.md" \
-            "$ISO".part* "$ISO.sha256" IXIN-OS-Setup.exe ixin-vm-engine-win64.zip ixin-vm-engine-win64.zip.sha256
+            "$ISO".part* "$ISO.sha256" IXIN-OS-Setup.exe ixin-vm-engine-win64.zip ixin-vm-engine-win64.zip.sha256 \
+            "$GITHUB_WORKSPACE/tools/ixin-os-vm.sh"
 
   site:
     # Flux du site os.ixin.online (nouvelle version, tailles, SHA-256) publié aussitôt la version créée

@@ -97,6 +97,8 @@ def main(site):
         shutil.copy(src, os.path.join(out, "docs", name))
         docs.append({"title": title, "file": name, "url": f"{PAGES}/site/docs/{name}",
                      "github": f"https://github.com/{REPOSITORY}/blob/HEAD/docs/{name}"})
+    # Lanceur « IXIN OS dans une fenêtre » pour Linux, à une adresse stable
+    shutil.copy(os.path.join(ROOT, "tools", "ixin-os-vm.sh"), os.path.join(out, "ixin-os-vm.sh"))
     shots = os.path.join(ROOT, "docs", "screenshots")
     shutil.copytree(shots, os.path.join(out, "screenshots"))
 
@@ -119,6 +121,13 @@ def main(site):
                 "for": "Windows 10 / 11 (64 bits) : installation à côté de Windows, sans clé USB",
             },
             "iso": iso,
+            "linux_vm": {
+                "name": "ixin-os-vm.sh",
+                "url": f"{PAGES}/site/ixin-os-vm.sh",
+                "command": f"curl -fsSLO {PAGES}/site/ixin-os-vm.sh && bash ixin-os-vm.sh",
+                "for": "Linux (Ubuntu, Debian, Mint, Fedora, Arch, openSUSE…) : IXIN OS dans une fenêtre, "
+                       "tout est installé et configuré automatiquement",
+            },
         },
         "requirements": {
             "cpu": "PC 64 bits Intel ou AMD (x86_64)",

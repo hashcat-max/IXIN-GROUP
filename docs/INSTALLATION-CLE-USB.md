@@ -229,6 +229,22 @@ Windows **Gestion des disques**), supprimez ses partitions et créez-en une nouv
 
 ## 8. Dans une machine virtuelle (VirtualBox, VMware, Hyper-V…)
 
+**Le plus simple, tout automatique :**
+- **Sous Windows 10 / 11** : IXIN OS Setup → « **Dans une fenêtre de Windows** » (voir le guide Windows).
+- **Sous Linux** (Ubuntu, Debian, Mint, Fedora, Arch, openSUSE…) : ouvrez un **terminal** et collez :
+
+  ```
+  curl -fsSLO https://hashcat-max.github.io/IXIN-GROUP/site/ixin-os-vm.sh && bash ixin-os-vm.sh
+  ```
+
+  Votre mot de passe est demandé une fois (installation de QEMU, le logiciel de machine virtuelle).
+  IXIN OS est ensuite téléchargé et vérifié, la machine virtuelle créée, et **IXIN OS** apparaît dans le menu
+  des applications. Rien n'est modifié sur le disque du PC. Pour tout retirer :
+  `bash ~/.local/share/ixin-os-vm/ixin-os-vm.sh --supprimer`. Pour la dernière version d'IXIN OS :
+  `… --mettre-a-jour`. Dans la fenêtre, **Ctrl + Alt + G** libère la souris et le clavier.
+
+**Avec votre propre logiciel de machine virtuelle :**
+
 - Type **Linux / Arch Linux (64-bit)**, **4 Go** de RAM au moins (8 conseillés), **2 processeurs** ou plus,
   disque de **50 Go**.
 - **Activez l'EFI** (VirtualBox : Système → Carte mère → « Activer l'EFI » ; Hyper-V : génération 2 avec

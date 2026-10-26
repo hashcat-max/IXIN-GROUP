@@ -37,7 +37,9 @@ sécurité du site (`connect-src 'self'`) interdit au navigateur de lire une aut
     "setup": { "name": "IXIN-OS-Setup.exe", "size": 3774976, "sha256": "7dfc…",
                "url": "https://github.com/…/releases/latest/download/IXIN-OS-Setup.exe", "for": "…" },
     "iso":   { "name": "ixin-os-2026.10.17-x86_64.iso", "size": 5063438336, "sha256": "c46a…",
-               "sha256_url": "…", "parts": [ { "name": "….iso.part00", "size": 1992294400, "url": "…" }, … ] }
+               "sha256_url": "…", "parts": [ { "name": "….iso.part00", "size": 1992294400, "url": "…" }, … ] },
+    "linux_vm": { "name": "ixin-os-vm.sh", "url": "https://…/site/ixin-os-vm.sh",
+                  "command": "curl -fsSLO https://…/site/ixin-os-vm.sh && bash ixin-os-vm.sh", "for": "…" }
   },
   "requirements": { "cpu": "…", "ram_gb": 4, "ram_recommended_gb": 8, "disk_gb": 40, … },
   "news": [ { "tag": "build-2026.10.17-5", "date": "2026-10-17", "title": "…", "items": [ "…", … ] }, … ],

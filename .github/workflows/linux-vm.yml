@@ -1,0 +1,84 @@
+# Machine virtuelle IXIN sous Linux (tools/ixin-os-vm.sh) : installation de QEMU par le gestionnaire de
+# paquets de plusieurs distributions, création de la machine virtuelle, démarrage jusqu'au firmware UEFI,
+# lecture de la dernière version publiée, suppression.
+name: Machine virtuelle IXIN (Linux)
+
+on:
+  push:
+    paths:
+      - tools/ixin-os-vm.sh
+      - .github/workflows/linux-vm.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Analyse du script (shellcheck)
+        run: shellcheck -S warning tools/ixin-os-vm.sh
+
+      - name: Dernière version publiée (API GitHub)
+        run: bash tools/ixin-os-vm.sh --derniere-version
+
+      - name: Préparation (QEMU installé avec apt)
+        run: |
+          # Accélération KVM pour l'utilisateur des tests
+          [ -e /dev/kvm ] && sudo chmod 666 /dev/kvm
+          head -c 16M /dev/zero > "$RUNNER_TEMP/fausse.iso"
+          IXIN_VM_ISO="$RUNNER_TEMP/fausse.iso" bash tools/ixin-os-vm.sh --preparer < /dev/null
+          bash tools/ixin-os-vm.sh --infos
+          test -x ~/.local/share/ixin-os-vm/ixin-os-vm.sh
+          test -f ~/.local/share/ixin-os-vm/ixin-os.qcow2
+          grep -q '^Exec=bash ' ~/.local/share/applications/ixin-os-vm.desktop
+
+      - name: Démarrage de la machine virtuelle (jusqu'au firmware UEFI)
+        run: |
+          rc=0
+          IXIN_VM_HEADLESS=1 IXIN_VM_EXTRA="-serial file:$RUNNER_TEMP/serie.log" \
+            timeout 60 bash ~/.local/share/ixin-os-vm/ixin-os-vm.sh || rc=$?
+          echo "code de sortie : $rc (124 = toujours en marche au bout de 60 s)"
+          tr -cd '[:print:]\n' < "$RUNNER_TEMP/serie.log" | head -n 20
+          test "$rc" = 124
+          grep -aqE 'BdsDxe|UEFI|Shell>' "$RUNNER_TEMP/serie.log"
+
+      - name: Suppression
+        run: |
+          bash tools/ixin-os-vm.sh --supprimer --oui
+          test ! -e ~/.local/share/ixin-os-vm
+          test ! -e ~/.local/share/applications/ixin-os-vm.desktop
+
+  distributions:
+    # Chemins d'installation de QEMU et du firmware propres à chaque famille de distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [debian:stable, fedora:latest, archlinux:latest, opensuse/tumbleweed]
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Base de paquets à jour (images de conteneur)
+        run: |
+          if command -v pacman >/dev/null; then pacman -Syu --noconfirm; fi
+      - name: Préparation
+        run: |
+          head -c 16M /dev/zero > /tmp/fausse.iso
+          IXIN_VM_ISO=/tmp/fausse.iso bash tools/ixin-os-vm.sh --preparer < /dev/null
+          bash tools/ixin-os-vm.sh --infos
+          bash tools/ixin-os-vm.sh --infos | grep -q '^Firmware *: /'
+      - name: Démarrage (émulation, jusqu'au firmware UEFI)
+        run: |
+          rc=0
+          IXIN_VM_HEADLESS=1 IXIN_VM_EXTRA="-serial file:/tmp/serie.log" \
+            timeout 90 bash ~/.local/share/ixin-os-vm/ixin-os-vm.sh || rc=$?
+          echo "code de sortie : $rc"
+          tr -cd '[:print:]\n' < /tmp/serie.log | head -n 20
+          test "$rc" = 124
+          grep -aqE 'BdsDxe|UEFI|Shell>' /tmp/serie.log

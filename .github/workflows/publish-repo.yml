@@ -24,6 +24,7 @@ on:
       - "repo/policy.json"
       - "tools/build-packages.sh"
       - "tools/prepare-site-feed.py"
+      - "tools/ixin-os-vm.sh"
       - "docs/**"
       - ".github/workflows/publish-repo.yml"
   workflow_dispatch:
