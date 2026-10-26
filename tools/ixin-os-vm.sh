@@ -62,6 +62,7 @@ FIRMWARES=(
     "/usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_VARS_4M.fd"
     "/usr/share/edk2/ovmf/OVMF_CODE.fd /usr/share/edk2/ovmf/OVMF_VARS.fd"
     "/usr/share/OVMF/OVMF_CODE.fd /usr/share/OVMF/OVMF_VARS.fd"
+    "/usr/share/qemu/ovmf-x86_64-4m-code.bin /usr/share/qemu/ovmf-x86_64-4m-vars.bin"
     "/usr/share/qemu/ovmf-x86_64-code.bin /usr/share/qemu/ovmf-x86_64-vars.bin"
     "/usr/share/edk2-ovmf/x64/OVMF_CODE.fd /usr/share/edk2-ovmf/x64/OVMF_VARS.fd"
     "/usr/share/qemu/edk2-x86_64-code.fd /usr/share/qemu/edk2-i386-vars.fd"
@@ -72,7 +73,24 @@ find_firmware() {
         read -r code vars <<<"$pair"
         [[ -f "$code" && -f "$vars" ]] && { echo "$code $vars"; return 0; }
     done
-    return 1
+    # Autres distributions : fichiers de description des firmwares fournis avec QEMU
+    command -v python3 >/dev/null || return 1
+    python3 - <<'PY'
+import glob, json, os, sys
+for f in sorted(glob.glob("/usr/share/qemu/firmware/*.json")):
+    try:
+        d = json.load(open(f))
+        m = d["mapping"]
+        if "uefi" not in d.get("interface-types", []) or m.get("device") != "flash": continue
+        if any(x in d.get("features", []) for x in ("secure-boot", "enrolled-keys", "amd-sev-snp", "intel-tdx")): continue
+        if not any(t.get("architecture") == "x86_64" for t in d.get("targets", [])): continue
+        code, vars = m["executable"]["filename"], m["nvram-template"]["filename"]
+        if os.path.isfile(code) and os.path.isfile(vars) and m["executable"].get("format", "raw") == "raw":
+            print(code, vars); sys.exit(0)
+    except (KeyError, ValueError, OSError):
+        pass
+sys.exit(1)
+PY
 }
 
 install_qemu() {
@@ -297,6 +315,7 @@ launch() {
     # shellcheck disable=SC1090
     source "$CONF"
     [[ -f "$FIRMWARE" ]] || fail "Firmware UEFI introuvable ($FIRMWARE) : relancez « bash ixin-os-vm.sh » dans un terminal."
+    # shellcheck disable=SC2054  # virgules : séparateurs des options de QEMU, pas du tableau
     local args=(
         -name "IXIN OS" -machine q35
         # Virtualisation matérielle (KVM) si possible, sinon émulation
@@ -310,6 +329,7 @@ launch() {
         -nic user,model=virtio-net-pci -device virtio-rng-pci
         -device qemu-xhci -device usb-tablet
     )
+    # shellcheck disable=SC2054
     [[ -f "$ISO" ]] && args+=(-drive "file=$ISO,if=none,id=cd0,media=cdrom,readonly=on" -device ide-cd,drive=cd0,bootindex=2)
     if [[ "${IXIN_VM_HEADLESS:-0}" == 1 ]]; then
         args+=(-display none -vga none)
