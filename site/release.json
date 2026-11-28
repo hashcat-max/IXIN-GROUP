@@ -1,0 +1,50 @@
+{
+ "tag_name": "build-2026.10.25-6",
+ "name": "IXIN OS build-2026.10.25-6",
+ "published_at": "2026-10-25T21:37:18Z",
+ "html_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/tag/build-2026.10.25-6",
+ "assets": [
+  {
+   "name": "ixin-os-2026.10.25-x86_64.iso.part00",
+   "size": 1992294400,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.25-6/ixin-os-2026.10.25-x86_64.iso.part00",
+   "digest": "sha256:3d16e8c87aeb9eac55c23f28e0ba65d901a38ab30ff3f3070433ec7b1dd598f7"
+  },
+  {
+   "name": "ixin-os-2026.10.25-x86_64.iso.part01",
+   "size": 1992294400,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.25-6/ixin-os-2026.10.25-x86_64.iso.part01",
+   "digest": "sha256:88a81fed5f8998e3ef4b8e569cc81d080a8295c7860a4bcc57e7693abd355d21"
+  },
+  {
+   "name": "ixin-os-2026.10.25-x86_64.iso.part02",
+   "size": 1145683968,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.25-6/ixin-os-2026.10.25-x86_64.iso.part02",
+   "digest": "sha256:523c0632bcb44dd1a2befb95fa265a71613822b509f0f110677bb089f253139a"
+  },
+  {
+   "name": "ixin-os-2026.10.25-x86_64.iso.sha256",
+   "size": 96,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.25-6/ixin-os-2026.10.25-x86_64.iso.sha256",
+   "digest": "sha256:9cf7fedeb81ef2856e7986ff028030ff76bc6af6429eee755646cff4b9591b24"
+  },
+  {
+   "name": "IXIN-OS-Setup.exe",
+   "size": 4205056,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.25-6/IXIN-OS-Setup.exe",
+   "digest": "sha256:c8a7107ddcf16bf6ba30cc708b66b1356b98659008b2f16cd5a25c62b290ff0e"
+  },
+  {
+   "name": "ixin-vm-engine-win64.zip",
+   "size": 50785961,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.25-6/ixin-vm-engine-win64.zip",
+   "digest": "sha256:2ff7af9a19337e7dc4f217917ba14605cf1327f5782ca9603c41f51d6e770ebd"
+  },
+  {
+   "name": "ixin-vm-engine-win64.zip.sha256",
+   "size": 91,
+   "browser_download_url": "https://github.com/hashcat-max/IXIN-GROUP/releases/download/build-2026.10.25-6/ixin-vm-engine-win64.zip.sha256",
+   "digest": "sha256:5e2f475a17d97867ee1942440dd4c7900e9398023d8c937d354e4995759aa0ba"
+  }
+ ]
+}
